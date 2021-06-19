@@ -15,18 +15,14 @@ var exit int
 
 func main() {
 	var readErrs int
-	paths := os.Args
+	paths := os.Args[1:]
 	/* Will print the help menu and exit the program if no other arguments are given. */
-	if len(paths) == 1 {
+	if len(paths) == 0 {
 		fmt.Printf("Help...")
 		os.Exit(0)
 	}
 	fmt.Println()
 	for index := range paths {
-		/* Skips the initial argument (this binary) so it doesn't get treated as a path target. */
-		if index == 0 {
-			continue
-		}
 		path := os.Args[index]
 		/* Tests for stdin directed at this program and treats "-" as a reference to it if there is. */
 		switch stdInfo, _ := os.Stdin.Stat(); {
@@ -37,6 +33,7 @@ func main() {
 			message, err = os.ReadFile(path)
 			if err != nil {
 				readErrs++
+				exit = 1
 				continue
 			}
 		}
@@ -45,10 +42,9 @@ func main() {
 	fmt.Println()
 	switch {
 	case readErrs == 1:
-		fmt.Printf("1 target is inaccessible, does it exist?\n")
+		fmt.Printf("1 target is inaccessible, does it exist?")
 	case readErrs > 1:
-		fmt.Printf("%d are inaccessible, do they exist?\n", readErrs)
+		fmt.Printf("%d are inaccessible, do they exist?", readErrs)
 	}
-	fmt.Printf("(Currently prints round count.)")
 	os.Exit(exit)
 }
