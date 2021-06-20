@@ -15,14 +15,17 @@ var exit int
 
 func main() {
 	var readErrs int
-	paths := os.Args[1:]
+	paths := os.Args
 	/* Will print the help menu and exit the program if no other arguments are given. */
-	if len(paths) == 0 {
+	if len(paths) == 1 {
 		fmt.Printf("Help...")
 		os.Exit(0)
 	}
 	fmt.Println()
 	for index := range paths {
+		if index == 0 {
+			continue
+		}
 		path := os.Args[index]
 		/* Tests for stdin directed at this program and treats "-" as a reference to it if there is. */
 		switch stdInfo, _ := os.Stdin.Stat(); {

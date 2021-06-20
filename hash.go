@@ -6,7 +6,6 @@ import (
 	"hash/crc64"
 	"math/big"
 	"os"
-	"regexp"
 	"strconv"
 )
 
@@ -45,21 +44,26 @@ func hash(msg []byte, ln int) string {
 	bit word length *if it isn't already*—skipping this effort was deemed not a security
 	risk. The word length of 64 was chosen to aid in parallelism and hasten the discovery
 	of primes later on in processing step. */
-	var expanded string
 	msg = append(msg, 0x80)
-	for len(msg) < ln/8 || len(msg)%8 != 0 {
+	encoded := msg
+	for len(encoded) < ln/8 || len(encoded)%8 != 0 {
 		/* URL encoding because I'm a special snowflake */
-		expanded = base64.URLEncoding.EncodeToString(msg)
+		encoded = []byte(base64.URLEncoding.EncodeToString(encoded))
 	}
-
+	expanded := string(encoded)
+	// fmt.Printf("    %d\n", len(expanded))
 	/* The COMPRESSION FUNCTION converts the block into a slice of 64-bit words and
 	procedurally trims it down to the required number of items (length/64) by recursively
 	subtracting the second-last index by it's last index until it gets to that magic
 	size. */
-	var block []*big.Int
-	splitBlock := regexp.MustCompile(".{8}").Split(expanded, -1)
-	for index := range splitBlock {
-		word := splitBlock[index]
+	var split []string
+	for len(expanded) != 0 {
+		split = append(split, expanded[:8])
+		expanded = expanded[8:]
+	}
+	block := make([]*big.Int, len(split))
+	for index := range split {
+		word := split[index]
 		result, _ := strconv.ParseInt(word, 16, 64)
 		block[index] = big.NewInt(result)
 	}
@@ -68,11 +72,12 @@ func hash(msg []byte, ln int) string {
 		ultima := len(block) - 1
 		penult := ultima - 1
 		block[penult] = one.Sub(block[penult], block[ultima])
-		block = block[:len(block) - 2]
+		block = block[:ultima]
 	}
+	// fmt.Printf("    %x %x %x\n", block[0], block[1], block[2])
 
 	// PRIMALITY-BASED PROCESSING
-	var polys []uint64
+	polys := make([]uint64, ln/64)
 	for index := range block {
 		word := block[index]
 		prime := block[index]
@@ -81,11 +86,13 @@ func hash(msg []byte, ln int) string {
 		}
 		polys[index] = one.Sub(word, prime).Uint64()
 	}
+	// fmt.Printf("    %x %x %x\n", polys[0], polys[1], polys[2])
 
 	// DIGEST FORMATION
-	var sections []uint64
+	sections := make([]uint64, ln/64)
+	var table *crc64.Table
 	for index := range polys {
-		table := crc64.MakeTable(polys[index])
+		table = crc64.MakeTable(polys[index])
 		sections[index] = crc64.Checksum(msg, table)
 	}
 	var digest string
