@@ -22,11 +22,20 @@ func main() {
 		os.Exit(0)
 	}
 	fmt.Println()
-	for index := range paths {
-		if index == 0 {
+	/* Checks that the requested digest length meets the function's requirements */
+	switch length {
+	case 192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024:
+		break
+	default:
+		fmt.Printf("\033[31mDigest length must be one of the following values:\033[0m\n" +
+			"192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024 bits")
+		os.Exit(22)
+	}
+	for dex := range paths {
+		if dex == 0 {
 			continue
 		}
-		path := os.Args[index]
+		path := os.Args[dex]
 		/* Tests for stdin directed at this program and treats "-" as a reference to it if there is. */
 		switch stdInfo, _ := os.Stdin.Stat(); {
 		case stdInfo.Size() > 0 && path == "-": /* Doesn't yet work as expected, unfortunately. */
@@ -40,7 +49,7 @@ func main() {
 				continue
 			}
 		}
-		fmt.Printf("    %s : %s\n", hash(message, length), path)
+		fmt.Printf("    \033[33m%s\033[0m : \033[4m%s\033[0m\n", hash(message, length), path)
 	}
 	fmt.Println()
 	switch {

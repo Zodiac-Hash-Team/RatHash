@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"hash/crc64"
 	"math/big"
-	"os"
 	"strconv"
 )
 
@@ -14,17 +13,8 @@ import (
 by its original author. © 2021 Matthew R Bonnette. The developer thanks The Go Authors
 and the developers of its respective libraries, especially those utilized herein. */
 
-/* This is a simple, often—albeit deterministically—inaccurate compositeness test based
-on Fermat's little theorem. big.Int.Exp() uses modular exponentiation; this function is
-highly optimized. false = composite, true = likely prime */
-func likelyPrime(x *big.Int) bool {
-	/* math/big is stupid: this means 2 ** (x - 1) == 1 */
-	return one.Exp(big.NewInt(2), one.Sub(x, one), x) == one
-}
-
 var message []byte
 var length = 192
-var one = big.NewInt(1)
 
 func hash(msg []byte, ln int) string {
 	/* Checks that the requested digest length meets the function's requirements */
@@ -32,9 +22,7 @@ func hash(msg []byte, ln int) string {
 	case 192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024:
 		break
 	default:
-		fmt.Printf("Digest length must be one of the following values:\n" +
-			"192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024 bits")
-		os.Exit(22)
+		panic("invalid input: digest length")
 	}
 
 	/* The EXPANSION FUNCTION expands messages by first appending a bit (byte 10000000)
@@ -51,7 +39,8 @@ func hash(msg []byte, ln int) string {
 		encoded = []byte(base64.URLEncoding.EncodeToString(encoded))
 	}
 	expanded := string(encoded)
-	// fmt.Printf("    %d\n", len(expanded))
+	fmt.Printf("    %d bytes expanded\n", len(expanded)) // Debugging
+
 	/* The COMPRESSION FUNCTION converts the block into a slice of 64-bit words and
 	procedurally trims it down to the required number of items (length/64) by recursively
 	subtracting the second-last index by it's last index until it gets to that magic
@@ -61,44 +50,46 @@ func hash(msg []byte, ln int) string {
 		split = append(split, expanded[:8])
 		expanded = expanded[8:]
 	}
-	block := make([]*big.Int, len(split))
-	for index := range split {
-		word := split[index]
-		result, _ := strconv.ParseInt(word, 16, 64)
-		block[index] = big.NewInt(result)
+	for dex := range split {
+		word := split[dex]
+		split[dex] = fmt.Sprintf("%x", word)
+	}
+	block := make([]int64, len(split))
+	for dex := range split {
+		word := split[dex]
+		block[dex], _ = strconv.ParseInt(word, 16, 64)
 	}
 	for len(block) != ln/64 {
 		/* Because the first index is 0 */
 		ultima := len(block) - 1
 		penult := ultima - 1
-		block[penult] = one.Sub(block[penult], block[ultima])
+		block[penult] = block[penult] ^ block[ultima]
 		block = block[:ultima]
 	}
-	// fmt.Printf("    %x %x %x\n", block[0], block[1], block[2])
+	fmt.Printf("    block: %x %x %x\n", block[0], block[1], block[2]) // Debugging
 
 	// PRIMALITY-BASED PROCESSING
 	polys := make([]uint64, ln/64)
-	for index := range block {
-		word := block[index]
-		prime := block[index]
-		for likelyPrime(prime) != true {
-			prime = one.Sub(prime, one)
+	for dex := range block {
+		word := block[dex]
+		prime := word
+		for big.NewInt(prime).ProbablyPrime(4) != true {
+			prime--
 		}
-		polys[index] = one.Sub(word, prime).Uint64()
+		polys[dex] = uint64(word^prime) ^ 0xffffffffffffffff
 	}
-	// fmt.Printf("    %x %x %x\n", polys[0], polys[1], polys[2])
+	fmt.Printf("    polys: %x %x %x\n", polys[0], polys[1], polys[2]) // Debugging
 
 	// DIGEST FORMATION
 	sections := make([]uint64, ln/64)
-	var table *crc64.Table
-	for index := range polys {
-		table = crc64.MakeTable(polys[index])
-		sections[index] = crc64.Checksum(msg, table)
+	for dex := range polys {
+		table := crc64.MakeTable(polys[dex])
+		sections[dex] = crc64.Checksum(msg, table)
 	}
 	var digest string
 	for index := range sections {
 		segment := sections[index]
-		digest += strconv.FormatUint(segment, 16)
+		digest += fmt.Sprintf("%x", segment)
 	}
 	return digest
 }
