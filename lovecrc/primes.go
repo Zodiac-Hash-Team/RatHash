@@ -1,4 +1,4 @@
-package main
+package lovecrc
 
 /* This is a speedy lookup table that includes all 6542 primes representable by 16-bit
 unsigned integers; these values are rendered in descending order for easier matching. */

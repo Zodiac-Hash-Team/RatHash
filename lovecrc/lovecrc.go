@@ -1,4 +1,4 @@
-package main
+package lovecrc
 
 import (
 	"encoding/base64"
@@ -12,7 +12,7 @@ import (
 by its original author. © 2021 Matthew R Bonnette. The developer thanks The Go Authors
 and the developers of its respective libraries, especially those utilized herein. */
 
-func hash(msg []byte, ln int) string {
+func Hash(msg []byte, ln int) string {
 	/* Checks that the requested digest length meets the function's requirements */
 	switch ln {
 	case 192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024:
