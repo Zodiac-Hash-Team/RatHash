@@ -16,11 +16,10 @@ commandline operator. It also enables the printing of a help menu. */
 var (
 	err     error
 	exit    int
-	message []byte
-	help    bool
 	length  int
-	pDelta  bool
+	message []byte
 )
+var printBase64, printHelp, printTime, printVerbose bool
 
 var rootCmd = &cobra.Command{
 	Use:   "lovecrc [flags] [file]...",
@@ -44,7 +43,7 @@ var rootCmd = &cobra.Command{
 		var readErrs int
 		for dex := range args {
 			path := args[dex]
-			start := time.Now()
+			t := time.Now()
 			/* Treats "-" as a reference to stdin if it's named. */
 			switch stdInfo, _ := os.Stdin.Stat(); {
 			case stdInfo.Size() > 0 && path == "-":
@@ -61,13 +60,41 @@ var rootCmd = &cobra.Command{
 			}
 
 			digest := lovecrc.Hash(message, length)
-			delta := time.Since(start).String()
-			switch {
-			case pDelta:
-				fmt.Printf("(%s)\n"+
-					"\033[33m%s\033[0m : \033[4m%s\033[0m\n", delta, digest, path)
+			delta := time.Since(t).String()
+			var sum string
+			switch printBase64 {
+			case true:
+				sum = digest.Str64
 			default:
-				fmt.Printf("\033[33m%s\033[0m : \033[4m%s\033[0m\n", digest, path)
+				sum = digest.Str
+			}
+			switch {
+			case printVerbose:
+				fmt.Printf("\033[90m%d\033[0m \033[35mbytes expanded in\033[0m %s\n"+
+					"\033[35mcompressed block in\033[0m %s:\n", digest.ESize, digest.EDelta, digest.CDelta)
+				for dex := range digest.Block {
+					switch {
+					case (dex+1)%8 == 0 || dex == len(digest.Block)-1:
+						fmt.Printf("\033[90m%x\033[0m\n", digest.Block[dex])
+					default:
+						fmt.Printf("\033[90m%x\033[0m ", digest.Block[dex])
+					}
+				}
+				fmt.Printf("\033[35mfound primes in\033[0m %s:\n", digest.PDelta)
+				for dex := range digest.Polys {
+					switch {
+					case (dex+1)%8 == 0 || dex == len(digest.Polys)-1:
+						fmt.Printf("\033[90m%x\033[0m\n", digest.Polys[dex])
+					default:
+						fmt.Printf("\033[90m%x\033[0m ", digest.Polys[dex])
+					}
+				}
+				fmt.Printf("\033[35mformed digest in\033[0m %s:\n"+
+					"\033[33m%s\033[0m : \033[4m%s\033[0m, %s total\n", digest.FDelta, sum, path, delta)
+			case printTime:
+				fmt.Printf("\033[33m%s\033[0m : \033[4m%s\033[0m, %s total\n", sum, path, delta)
+			default:
+				fmt.Printf("\033[33m%s\033[0m : \033[4m%s\033[0m\n", sum, path)
 			}
 		}
 
@@ -82,12 +109,18 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Flags().BoolVarP(&help, "help", "h", false,
-		"\033[35mprints this help menu\033[0m")
+	rootCmd.Flags().BoolVarP(&printHelp, "help", "h", false,
+		"\033[35mprints this help menu\033[0m\n")
+	rootCmd.Flags().BoolVarP(&printBase64, "base64", "b", false,
+		"\033[35mrenders digest as base64 string\033[0m (default hexadecimal string)")
 	rootCmd.Flags().IntVarP(&length, "length", "l", 192,
 		"\033[35moutput digest length in bits\033[0m")
-	rootCmd.Flags().BoolVarP(&pDelta, "time", "t", false,
+	rootCmd.Flags().BoolVarP(&printTime, "time", "t", false,
 		"\033[35mprints time taken to process each message\033[0m")
+	rootCmd.Flags().BoolVarP(&printVerbose, "verbose", "v", false,
+		"\033[35mprints detailed output regarding each step of the hashing\n"+
+			"process\033[0m (includes results from --time)")
+	rootCmd.Flags().SortFlags = false
 }
 
 func main() {
