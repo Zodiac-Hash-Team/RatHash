@@ -51,8 +51,8 @@ func compress(expanded string, ln int) ([]uint32, time.Duration) {
 	}
 	ultima := len(block) - 1
 	penult := ultima - 1
-	for penult != 0 {
-		block[penult] = block[penult] - block[ultima]
+	for penult != -1 {
+		block[penult] = block[penult] ^ block[ultima]
 		ultima--
 		penult--
 	}
