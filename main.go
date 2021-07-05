@@ -119,13 +119,13 @@ func main() {
 					fmt.Printf(gray+"%x"+zero+" ", digest.Block[dex])
 				}
 			}
-			fmt.Printf(purp+"Found primes in"+zero+" (%s):\n", digest.PDelta)
+			fmt.Printf(purp+"Found polynomials in"+zero+" (%s):\n", digest.PDelta)
 			for dex := range digest.Polys {
 				switch {
-				case (dex+1)%8 == 0 || dex == len(digest.Polys)-1:
+				case (dex+1)%4 == 0 || dex == len(digest.Polys)-1:
 					fmt.Printf(gray+"%x"+zero+"\n", digest.Polys[dex])
 				default:
-					fmt.Printf(gray+"%x"+zero+" ", digest.Polys[dex])
+					fmt.Printf(gray+"%x"+zero+"  ", digest.Polys[dex])
 				}
 			}
 			fmt.Printf(purp+"Formed digest in"+zero+" (%s):\n"+
