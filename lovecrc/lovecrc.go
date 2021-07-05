@@ -28,80 +28,91 @@ type Digest struct {
 	EDelta, CDelta, PDelta, FDelta time.Duration
 }
 
-func expand(encoded []byte, ln int) (string, int, time.Duration) {
-	t := time.Now()
-	encoded = append(encoded, 0x80)
-	for len(encoded) < ln/8 || len(encoded)%4 != 0 {
-		encoded = []byte(base64.StdEncoding.EncodeToString(encoded))
-	}
-	return string(encoded), len(encoded), time.Since(t)
+var length int
+var digest = Digest{
+	Block: make([]uint32, length/32),
+	Polys: make([]uint32, length/32),
 }
 
-func compress(expanded string, ln int) ([]uint32, time.Duration) {
+func expand(enc []byte) (*[]uint32, int, time.Duration) {
 	t := time.Now()
-	var split []string
-	for len(expanded) != 0 {
-		split = append(split, expanded[:4])
-		expanded = expanded[4:]
+	for len(enc) < length/8 || len(enc)%4 != 0 {
+		enc = []byte(base64.StdEncoding.EncodeToString(enc))
 	}
-	block := make([]uint32, len(split))
+	exp := string(enc)
+
+	var split []string
+	for len(exp) != 0 {
+		split = append(split, exp[:4])
+		exp = exp[4:]
+	}
+	blk := make([]uint32, len(split))
 	for dex := range split {
 		word, _ := strconv.ParseUint(fmt.Sprintf("%x", split[dex]), 16, 32)
-		block[dex] = uint32(word)
+		blk[dex] = uint32(word)
 	}
-	ultima := len(block) - 1
+	return &blk, len(enc), time.Since(t)
+}
+
+func compress(blk *[]uint32) time.Duration {
+	t := time.Now()
+	ultima := len(*blk) - 1
 	penult := ultima - 1
 	for penult != -1 {
-		block[penult] = block[penult] ^ block[ultima]
+		(*blk)[penult] = (*blk)[penult] ^ (*blk)[ultima]
 		ultima--
 		penult--
 	}
-	return block[:ln/32], time.Since(t)
+	*blk = (*blk)[:length/32]
+	return time.Since(t)
 }
 
-func process(block []uint32) ([]uint32, time.Duration) {
+func process(blk *[]uint32) time.Duration {
 	t := time.Now()
-	for dex := range block {
-		word := int64(block[dex])
+	for dex := range *blk {
+		word := int64((*blk)[dex])
 		for big.NewInt(word).ProbablyPrime(1) != true {
 			word--
 		}
-		block[dex] = uint32(word)
+		(*blk)[dex] = uint32(word)
 	}
-	return block, time.Since(t)
+	return time.Since(t)
 }
 
-func form(msg []byte, polys []uint32) ([]byte, string, string, time.Duration) {
+func form(msg *[]byte, polys *[]uint32) ([]byte, string, string, time.Duration) {
 	t := time.Now()
-	msg = append(msg, 0x80)
 	var bytes []byte
 	var str string
-	for dex := range polys {
-		table := crc32.MakeTable(polys[dex])
-		polys[dex] = crc32.Checksum(msg, table)
+	for dex := range *polys {
+		table := crc32.MakeTable((*polys)[dex])
+		(*polys)[dex] = crc32.Checksum(*msg, table)
 
 		segment := make([]byte, 4)
-		binary.BigEndian.PutUint32(segment, polys[dex])
+		binary.BigEndian.PutUint32(segment, (*polys)[dex])
 		bytes = append(bytes, segment...)
-		str += fmt.Sprintf("%x", polys[dex])
+		str += fmt.Sprintf("%x", (*polys)[dex])
 	}
 	return bytes, str, base64.StdEncoding.EncodeToString(bytes), time.Since(t)
 }
 
-func Hash(msg []byte, ln int) Digest {
+func Hash(msg *[]byte, ln *int) Digest {
+	length = *ln
 	/* Checks that the requested digest length meets the function's requirements */
-	switch ln {
+	switch length {
 	case 192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024:
 		break
 	default:
 		panic("invalid input: digest length")
 	}
 
-	var digest Digest
-	var expanded string
-	expanded, digest.ESize, digest.EDelta = expand(msg, ln)
-	digest.Block, digest.CDelta = compress(expanded, ln)
-	digest.Polys, digest.PDelta = process(digest.Block)
-	digest.Bytes, digest.Str, digest.Str64, digest.FDelta = form(msg, digest.Polys)
+	var block *[]uint32
+	*msg = append(*msg, 0x80)
+	block, digest.ESize, digest.EDelta = expand(*msg)
+	digest.CDelta = compress(block)
+	_ = copy(digest.Block, *block)
+	digest.PDelta = process(block)
+	_ = copy(digest.Polys, *block)
+	digest.Bytes, digest.Str, digest.Str64, digest.FDelta = form(msg, block)
+	*msg = (*msg)[:len(*msg)-1]
 	return digest
 }

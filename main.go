@@ -53,11 +53,11 @@ func main() {
 	if pflag.NArg() == 0 || *pHelp {
 		fmt.Printf(yell + "The CRC-based cryptographic hashing algorithm." + zero + "\n\n" +
 			"Usage:\n" +
-			"   lovecrc [-h] [--quiet|no-formatting] <[--]>\n" +
-			"           [-b] [--quiet|no-formatting] [-l <int>|l=<int>] <[--]> -|FILE...\n" +
-			"           [-b] [-v|t] [--no-formatting] [-l <int>|l=<int>] <[--]> -|FILE...\n" +
-			"           [-b] [--quiet|no-formatting] [-l <int>|l=<int>] -s <[--]> STRING...\n" +
-			"           [-b] [-v|t] [--no-formatting] [-l <int>|l=<int>] -s <[--]> STRING...\n\n" +
+			"  lovecrc [-h] [--quiet|no-formatting] <[--]>\n" +
+			"          [-b] [--quiet|no-formatting] [-l <int>|l=<int>] <[--]> -|FILE...\n" +
+			"          [-b] [-v|t] [--no-formatting] [-l <int>|l=<int>] <[--]> -|FILE...\n" +
+			"          [-b] [--quiet|no-formatting] [-l <int>|l=<int>] -s <[--]> STRING...\n" +
+			"          [-b] [-v|t] [--no-formatting] [-l <int>|l=<int>] -s <[--]> STRING...\n\n" +
 			"Options:\n")
 		pflag.PrintDefaults()
 		fmt.Printf("\nThanks to spf13's pflag, placement of arguments after `lovecrc` does not matter\n" +
@@ -96,14 +96,13 @@ func main() {
 			exit = 1
 			continue
 		}
-		digest := lovecrc.Hash(message, *pLength)
+		digest := lovecrc.Hash(&message, pLength)
 		delta := time.Since(t).String()
 
-		switch {
-		case *pBase64:
+		if *pBase64 {
 			digest.Str = digest.Str64
-			fallthrough
-		case *pString:
+		}
+		if *pString {
 			path = fmt.Sprintf(zero + "\"" + path + "\"")
 		}
 		switch {
