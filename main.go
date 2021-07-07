@@ -96,7 +96,7 @@ func main() {
 			exit = 1
 			continue
 		}
-		digest := lovecrc.Hash(&message, pLength)
+		digest := lovecrc.Hash(&message, *pLength)
 		delta := time.Since(t).String()
 
 		if *pBase64 {

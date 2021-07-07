@@ -88,8 +88,8 @@ func form(msg *[]byte, polys *[]uint64) ([]byte, string, string, time.Duration) 
 	return bytes, str, base64.StdEncoding.EncodeToString(bytes), time.Since(t)
 }
 
-func Hash(msg *[]byte, ln *int) Digest {
-	length = *ln
+func Hash(msg *[]byte, ln int) Digest {
+	length = ln
 	/* Checks that the requested digest length meets the function's requirements */
 	switch length {
 	case 192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024:
