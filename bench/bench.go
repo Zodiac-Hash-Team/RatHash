@@ -79,7 +79,7 @@ func b3(name string, size int64) {
 }
 
 func main() {
-	fmt.Printf("Running benchmarks! ~30sec on midgrade hardware.\n\n" +
+	fmt.Printf("Running benchmarks!\n\n" +
 		"Function:         Speed:           Usage:\n")
 
 	t := time.Now()
@@ -95,5 +95,5 @@ func main() {
 	sha2("SHA2-1G    ", 1024*1024*1024)
 	b3("BLAKE3-1G  ", 1024*1024*1024)
 
-	fmt.Printf("\nFinished in %s on %s/%s\n", time.Since(t), runtime.GOOS, runtime.GOARCH)
+	fmt.Printf("\nFinished in %s on %s/%s.\n", time.Since(t), runtime.GOOS, runtime.GOARCH)
 }

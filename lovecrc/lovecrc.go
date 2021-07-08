@@ -7,6 +7,7 @@ import (
 	"hash/crc64"
 	"math/big"
 	"time"
+	"unsafe"
 )
 
 // N.B.: This project is currently InDev. © 2021 Matthew R Bonnette
@@ -28,64 +29,82 @@ type Digest struct {
 	EDelta, CDelta, PDelta, FDelta time.Duration
 }
 
-var length int
+var (
+	length   int
+	message  *[]byte
+	expanded []byte
+	block    []uint32
+	polys    []uint64
+	digest   Digest
+)
 
-func expand(enc []byte) (*[]uint32, int, time.Duration) {
+func expand() {
 	t := time.Now()
-	for len(enc) < length/8 || len(enc)%4 != 0 {
-		enc = []byte(base64.StdEncoding.EncodeToString(enc))
+	*message = append(*message, 0x80)
+	expanded = *message
+	for len(expanded) < length/8 || len(expanded)%4 != 0 {
+		expanded = []byte(base64.StdEncoding.EncodeToString(expanded))
 	}
-	split := make([]uint32, len(enc)/4)
-	for dex := range split {
-		split[dex] = uint32(enc[0+dex*4])<<24 | uint32(enc[1+dex*4])<<16 |
-			uint32(enc[2+dex*4])<<8 | uint32(enc[3+dex*4])
-	}
-	return &split, len(enc), time.Since(t)
+	digest.ESize = len(expanded)
+	digest.EDelta = time.Since(t)
 }
 
-func compress(blk *[]uint32) time.Duration {
+func compress() {
 	t := time.Now()
-	ultima := len(*blk) - 1
+	block = make([]uint32, len(expanded)/4)
+	for dex := range block {
+		/* Little-endian */
+		block[dex] = *(*uint32)(unsafe.Pointer(&expanded[dex*4]))
+	}
+	ultima := len(block) - 1
 	penult := ultima - 1
 	for penult != -1 {
-		(*blk)[penult] = (*blk)[penult] ^ (*blk)[ultima]
+		block[penult] = block[penult] ^ block[ultima]
 		ultima--
 		penult--
 	}
-	*blk = (*blk)[:length/32]
-	return time.Since(t)
+	block = block[:length/32]
+	digest.Block = append(digest.Block, block...)
+	digest.CDelta = time.Since(t)
 }
 
-func process(blk *[]uint32) (*[]uint64, time.Duration) {
+func process() {
 	t := time.Now()
-	for dex := range *blk {
-		word := int64((*blk)[dex])
+	for dex := range block {
+		word := int64(block[dex])
 		for big.NewInt(word).ProbablyPrime(1) != true {
 			word--
 		}
-		(*blk)[dex] = uint32(word)
+		block[dex] = uint32(word)
 	}
-	polys := make([]uint64, length/64)
+	polys = make([]uint64, length/64)
 	for dex := range polys {
-		polys[dex] = uint64((*blk)[0+dex*2])<<32 | uint64((*blk)[1+dex*2])
+		/* Little-endian */
+		polys[dex] = *(*uint64)(unsafe.Pointer(&block[dex*2]))
 	}
-	return &polys, time.Since(t)
+	digest.Polys = append(digest.Polys, polys...)
+	digest.PDelta = time.Since(t)
 }
 
-func form(msg *[]byte, polys *[]uint64) ([]byte, string, string, time.Duration) {
+func form() {
 	t := time.Now()
 	var bytes []byte
 	var str string
-	for dex := range *polys {
-		table := crc64.MakeTable((*polys)[dex])
-		(*polys)[dex] = crc64.Checksum(*msg, table)
-
-		split := make([]byte, 8)
-		binary.BigEndian.PutUint64(split, (*polys)[dex])
-		bytes = append(bytes, split...)
-		str += fmt.Sprintf("%x", (*polys)[dex])
+	for dex := range polys {
+		go func() {
+			table := crc64.MakeTable(polys[dex])
+			polys[dex] = crc64.Checksum(*message, table)
+		}()
+		tmp := make([]byte, 8)
+		binary.LittleEndian.PutUint64(tmp, polys[dex])
+		bytes = append(bytes, tmp...)
+		str += fmt.Sprintf("%x", polys[dex])
 	}
-	return bytes, str, base64.StdEncoding.EncodeToString(bytes), time.Since(t)
+	digest.Bytes = bytes
+	digest.Str = str
+	digest.Str64 = base64.StdEncoding.EncodeToString(bytes)
+	*message = (*message)[:len(*message)-1]
+	digest.FDelta = time.Since(t)
 }
 
 func Hash(msg *[]byte, ln int) Digest {
@@ -97,26 +116,10 @@ func Hash(msg *[]byte, ln int) Digest {
 	default:
 		panic("invalid input: digest length")
 	}
-
-	/* Declare helper variables and prep the value behind pointer msg by appending a byte. */
-	var (
-		digest Digest
-		blk    *[]uint32
-		polys  *[]uint64
-	)
-	*msg = append(*msg, 0x80)
-	/* Call the expansion function on the value behind msg. */
-	blk, digest.ESize, digest.EDelta = expand(*msg)
-	/* Call the compression function on pointer blk and copy the resulting values behind
-	it to digest.Block. */
-	digest.CDelta = compress(blk)
-	digest.Block = append(digest.Block, *blk...)
-	/* Process blk and copy the resulting values behind polys to digest.Polys. */
-	polys, digest.PDelta = process(blk)
-	digest.Polys = append(digest.Polys, *polys...)
-	/* Form the digest as raw bytes, a hexadecimal string, and a base64 string. */
-	digest.Bytes, digest.Str, digest.Str64, digest.FDelta = form(msg, polys)
-	/* Remove the added byte from msg. */
-	*msg = (*msg)[:len(*msg)-1]
+	message = msg
+	expand()
+	compress()
+	process()
+	form()
 	return digest
 }
