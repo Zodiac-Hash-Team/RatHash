@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"github.com/spf13/pflag"
 	"io"
-	"main/lovecrc"
+	"main/rathash"
 	"os"
 	"runtime"
 	"time"
 )
 
-/* The code in this file is what allows this hash function to be used as a program:
-It handles commandline flags and arguments, processing files as required by the
-commandline operator. It also enables the printing of a help menu. */
+// Copyright © 2021 Matthew R Bonnette.
+/* The code in this file is what allows this hash function to be used as a program: It handles
+commandline flags and arguments, processing files as required by the commandline operator. It also
+enables the printing of a help menu. */
 
 func main() {
 	var (
@@ -22,8 +23,8 @@ func main() {
 		message  []byte
 	)
 	var noFormatting, quiet bool
-	for dex := range os.Args {
-		switch os.Args[dex] {
+	for i := range os.Args {
+		switch os.Args[i] {
 		case "--no-formatting":
 			noFormatting = true
 		case "--quiet":
@@ -53,14 +54,14 @@ func main() {
 	if pflag.NArg() == 0 || *pHelp {
 		fmt.Printf(yell + "The CRC-based cryptographic hashing algorithm." + zero + "\n\n" +
 			"Usage:\n" +
-			"  lovecrc [-h] [--quiet|no-formatting] <[--]>\n" +
+			"  rathash [-h] [--quiet|no-formatting] <[--]>\n" +
 			"          [-b] [--quiet|no-formatting] [-l <int>|l=<int>] <[--]> -|FILE...\n" +
 			"          [-b] [-v|t] [--no-formatting] [-l <int>|l=<int>] <[--]> -|FILE...\n" +
 			"          [-b] [--quiet|no-formatting] [-l <int>|l=<int>] -s <[--]> STRING...\n" +
 			"          [-b] [-v|t] [--no-formatting] [-l <int>|l=<int>] -s <[--]> STRING...\n\n" +
 			"Options:\n")
 		pflag.PrintDefaults()
-		fmt.Printf("\nThanks to spf13's pflag, placement of arguments after `lovecrc` does not matter\n" +
+		fmt.Printf("\nThanks to spf13's pflag, placement of arguments after `rathash` does not matter\n" +
 			"unless `--` is specified to signal the end of parsed flag groups. Longform flag\n" +
 			"equivalents above. `-` is treated as a reference to STDIN.\n")
 		os.Exit(0)
@@ -75,8 +76,8 @@ func main() {
 			"192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024 bits")
 		os.Exit(22)
 	}
-	for dex := range pflag.Args() {
-		path := pflag.Arg(dex)
+	for i := range pflag.Args() {
+		path := pflag.Arg(i)
 		t := time.Now()
 		/* Treats "-" as a reference to stdin if it's named. */
 		switch stdInfo, _ := os.Stdin.Stat(); {
@@ -96,7 +97,7 @@ func main() {
 			exit = 1
 			continue
 		}
-		digest := lovecrc.Hash(&message, *pLength)
+		digest := rathash.Hash(&message, *pLength)
 		delta := time.Since(t).String()
 
 		if *pBase64 {
@@ -111,21 +112,21 @@ func main() {
 		case *pVerbose:
 			fmt.Printf(purp+"Expanded to"+zero+" "+gray+"%d bytes"+zero+" "+purp+"in"+zero+" (%s)\n"+
 				purp+"Compressed block in"+zero+" (%s):\n", digest.ESize, digest.EDelta, digest.CDelta)
-			for dex := range digest.Block {
+			for i2 := range digest.Block {
 				switch {
-				case (dex+1)%8 == 0 || dex == len(digest.Block)-1:
-					fmt.Printf(gray+"%x"+zero+"\n", digest.Block[dex])
+				case (i2+1)%8 == 0 || i2 == len(digest.Block)-1:
+					fmt.Printf(gray+"%x"+zero+"\n", digest.Block[i2])
 				default:
-					fmt.Printf(gray+"%x"+zero+" ", digest.Block[dex])
+					fmt.Printf(gray+"%x"+zero+" ", digest.Block[i2])
 				}
 			}
 			fmt.Printf(purp+"Found polynomials in"+zero+" (%s):\n", digest.PDelta)
-			for dex := range digest.Polys {
+			for i2 := range digest.Polys {
 				switch {
-				case (dex+1)%4 == 0 || dex == len(digest.Polys)-1:
-					fmt.Printf(gray+"%x"+zero+"\n", digest.Polys[dex])
+				case (i2+1)%4 == 0 || i2 == len(digest.Polys)-1:
+					fmt.Printf(gray+"%x"+zero+"\n", digest.Polys[i2])
 				default:
-					fmt.Printf(gray+"%x"+zero+"  ", digest.Polys[dex])
+					fmt.Printf(gray+"%x"+zero+"  ", digest.Polys[i2])
 				}
 			}
 			fmt.Printf(purp+"Formed digest in"+zero+" (%s):\n"+
