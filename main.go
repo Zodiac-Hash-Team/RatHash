@@ -31,9 +31,9 @@ func main() {
 			quiet = true
 		}
 	}
-	yell, purp, gray, und, zero := "\033[33m", "\033[35m", "\033[90m", "\033[4m", "\033[0m"
+	yell, purp, _, und, zero := "\033[33m", "\033[35m", "\033[90m", "\033[4m", "\033[0m"
 	if runtime.GOOS == "windows" || noFormatting || quiet {
-		yell, purp, gray, und, zero = "", "", "", "", ""
+		yell, purp, _, und, zero = "", "", "", "", ""
 	}
 	pHelp := pflag.BoolP("help", "h", false, purp+"prints this help menu"+zero+"\n")
 	pBase64 := pflag.BoolP("base64", "b", false, purp+"renders digest as base64 string"+zero+
@@ -68,8 +68,8 @@ func main() {
 	}
 
 	/* Checks that the requested digest length meets the function's requirements */
-	switch *pLength {
-	case 192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024:
+	switch {
+	case *pLength >= 256 && *pLength%64 == 0:
 		break
 	default:
 		fmt.Printf(purp + "Digest length must be one of the following values:" + zero + "\n" +
@@ -110,27 +110,29 @@ func main() {
 		case quiet:
 			fmt.Printf("%s\n", digest.Str)
 		case *pVerbose:
-			fmt.Printf(purp+"Expanded to"+zero+" "+gray+"%d bytes"+zero+" "+purp+"in"+zero+" (%s)\n"+
-				purp+"Compressed block in"+zero+" (%s):\n", digest.ESize, digest.EDelta, digest.CDelta)
-			for i2 := range digest.Block {
-				switch {
-				case (i2+1)%8 == 0 || i2 == len(digest.Block)-1:
-					fmt.Printf(gray+"%x"+zero+"\n", digest.Block[i2])
-				default:
-					fmt.Printf(gray+"%x"+zero+" ", digest.Block[i2])
+			/*
+				fmt.Printf(purp+"Expanded to"+zero+" "+gray+"%d bytes"+zero+" "+purp+"in"+zero+" (%s)\n"+
+					purp+"Compressed block in"+zero+" (%s):\n", digest.ESize, digest.EDelta, digest.CDelta)
+				for i2 := range digest.Block {
+					switch {
+					case (i2+1)%8 == 0 || i2 == len(digest.Block)-1:
+						fmt.Printf(gray+"%x"+zero+"\n", digest.Block[i2])
+					default:
+						fmt.Printf(gray+"%x"+zero+" ", digest.Block[i2])
+					}
 				}
-			}
-			fmt.Printf(purp+"Found polynomials in"+zero+" (%s):\n", digest.PDelta)
-			for i2 := range digest.Polys {
-				switch {
-				case (i2+1)%4 == 0 || i2 == len(digest.Polys)-1:
-					fmt.Printf(gray+"%x"+zero+"\n", digest.Polys[i2])
-				default:
-					fmt.Printf(gray+"%x"+zero+"  ", digest.Polys[i2])
+				fmt.Printf(purp+"Found polynomials in"+zero+" (%s):\n", digest.PDelta)
+				for i2 := range digest.Polys {
+					switch {
+					case (i2+1)%4 == 0 || i2 == len(digest.Polys)-1:
+						fmt.Printf(gray+"%x"+zero+"\n", digest.Polys[i2])
+					default:
+						fmt.Printf(gray+"%x"+zero+"  ", digest.Polys[i2])
+					}
 				}
-			}
-			fmt.Printf(purp+"Formed digest in"+zero+" (%s):\n"+
-				yell+"%s"+zero+" : "+und+"%s"+zero+", (%s)\n", digest.FDelta, digest.Str, path, delta)
+				fmt.Printf(purp+"Formed digest in"+zero+" (%s):\n"+
+					yell+"%s"+zero+" : "+und+"%s"+zero+", (%s)\n", digest.FDelta, digest.Str, path, delta)
+			*/
 		case *pTime:
 			fmt.Printf(yell+"%s"+zero+" : "+und+"%s"+zero+", (%s)\n", digest.Str, path, delta)
 		default:
