@@ -71,6 +71,9 @@ func test(key string) {
 	switch key {
 	case "rat":
 		length = runtime.NumCPU() * 64
+		if length < 256 {
+			length = 256
+		}
 		for i := uint32(ints) - 1; int32(i) > -1; i-- {
 			binary.BigEndian.PutUint32(intBytes, i)
 			numbers[i] = big.NewInt(0).SetBytes(rathash.Sum(intBytes, length))
@@ -136,6 +139,9 @@ func test(key string) {
 func rat(name string, size int64) {
 	makeBytes(size)
 	length = runtime.NumCPU() * 64
+	if length < 256 {
+		length = 256
+	}
 	fn := func(b *testing.B) {
 		b.SetBytes(size)
 		for i := b.N; i > 0; i-- {
