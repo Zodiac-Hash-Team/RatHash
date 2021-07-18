@@ -3,4 +3,3 @@
 build.fish
 /.tmp/*
 source.tar.xz
-go.sum
