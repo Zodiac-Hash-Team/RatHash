@@ -1,82 +1,71 @@
 package rathash
 
 import (
-	"encoding/base64"
-	"hash/crc64"
+	"math/big"
 	"math/bits"
-	"strconv"
 	"sync"
-	"time"
 	"unsafe"
 )
 
-// N.B.: This project is currently InDev. Copyright © 2021 Matthew R Bonnette.
+// N.B.: This project is currently InDev.
+// Copyright © 2021 Matthew R Bonnette. Openly-licensed under a BSD-3-Clause license.
 /* This file is the reference Go implementation of the RatHash function as contrived by its original
-author. RatHash's developer thanks The Go Authors and the developers of its respective libraries,
-especially those utilized herein. */
+author. RatHash's developer thanks The Go Authors and the developers of any third-party libraries
+utilized in this project. */
 
-type Digest struct {
-	// Permits the rendering of the digest in more than one way
-	Bytes      []byte /* digest as a slice of raw bytes */
-	Str, Str64 string /* digest as hexadecimal and base64 encoded strings */
-
-	// Allows for verbose output at the functional level
-	BSize int /* internal block size  */
-	/* slices of compressed words and determined polynomials, respectively */
-	Polys []uint64
-	/* time taken to complete each of the steps: expand, divide, process, form */
-	EDelta, DDelta, PDelta, FDelta time.Duration
-}
-
-func Hash(msg *[]byte, ln int) Digest {
+func Sum(msg []byte, ln int) []byte {
 	/* Checks that the requested digest length meets the function's requirements */
-	switch {
-	case ln >= 256 && ln%64 == 0:
-		break
-	default:
+	if ln < 256 || ln%64 != 0 {
 		panic("invalid input: digest length")
 	}
 	var (
-		expanded []byte
-		blocks   [][]byte
-		group    sync.WaitGroup
-		digest   Digest
+		message = msg
+		blocks  [][]byte
+		group   sync.WaitGroup
+		digest  []byte
 	)
 
-	// PRELIMINARY EXPANSION
-	t := time.Now()
-	expanded = *msg
-	if len(expanded) < ln/4 {
-		expanded = append(expanded, 0x40)
-		for len(expanded) < ln/4 {
-			expanded = []byte(base64.StdEncoding.EncodeToString(expanded))
+	// KEY STRETCHING
+	if len(message) < ln/2 {
+		ceiling := len(primes) - 1
+		product, prime, one := big.NewInt(0).SetBytes(message), big.NewInt(0), big.NewInt(1)
+		product.Add(product, one) /* Makes input zero-insensitive */
+		for i := 1; product.BitLen() < ln*4; i++ {
+			if i > ceiling {
+				prime.Add(product, one)
+				for prime.ProbablyPrime(1) != true {
+					prime.Add(product, one)
+				}
+				product.Mul(product, prime)
+				continue
+			}
+			prime.SetUint64(primes[i])
+			product.Mul(product, prime)
 		}
+		message = product.Bytes()
 	}
-	digest.EDelta = time.Since(t)
 
 	// MESSAGE DIVISION
-	t = time.Now()
-	for len(expanded)%(ln/64) != 0 {
-		expanded = append(expanded, 0x40)
+	for len(message)%(ln/64) != 0 {
+		message = append(message, 0x01)
 	}
-	bSize := len(expanded) / (ln / 64)
-	for len(expanded) != 0 {
-		blocks = append(blocks, expanded[:bSize])
-		expanded = expanded[bSize:]
+	bSize := len(message) / (ln / 64)
+	for len(message) != 0 {
+		blocks = append(blocks, message[:bSize])
+		message = message[bSize:]
 	}
-	digest.DDelta = time.Since(t)
+	for i := range blocks {
+		/* Supplemental expansion */
+		for len(blocks[i])%8 != 0 {
+			blocks[i] = append(blocks[i], 0x01)
+		}
+	}
 
-	// PARALLELIZED PROCESSING
-	t = time.Now()
-	digest.Polys = make([]uint64, ln/64)
+	// DIFFUSION FUNCTION
+	polys := make([]uint64, ln/64)
 	for i := range blocks {
 		group.Add(1)
 		go func(i int) {
-			/* Supplemental expansion */
-			for len(blocks[i])%8 != 0 {
-				blocks[i] = append(blocks[i], 0x40)
-			}
-
 			/* Converts each block of bytes into a block of uint64's */
 			block := make([]uint64, bSize/8)
 			for i2 := range block {
@@ -85,74 +74,70 @@ func Hash(msg *[]byte, ln int) Digest {
 			}
 
 			/* In descending order and starting with the penultimate word, assign each word with the
-			result of itself XORred by its predecessor bit-rotated by 1 to the left. */
+			result of itself ANDed by its predecessor. */
 			ultima := len(block) - 1
 			penult := ultima - 1
 			for penult != -1 {
-				block[penult] ^= bits.RotateLeft64(block[ultima], 1)
+				block[penult] &= block[ultima]
 				ultima--
 				penult--
 			}
-			block[len(block)-1] ^= bits.RotateLeft64(block[0], 1)
-			/* Mark the 64-bit word at index 0 as the polynomial for this block. */
-			digest.Polys[i] = block[0]
-
-			/* Assign the processed words as the []byte content of the block they came from. */
-			for i2 := range block {
-				blocks[i][0+i2*8] = byte(block[i2])
-				blocks[i][1+i2*8] = byte(block[i2] >> 8)
-				blocks[i][2+i2*8] = byte(block[i2] >> 16)
-				blocks[i][3+i2*8] = byte(block[i2] >> 24)
-				blocks[i][4+i2*8] = byte(block[i2] >> 32)
-				blocks[i][5+i2*8] = byte(block[i2] >> 40)
-				blocks[i][6+i2*8] = byte(block[i2] >> 48)
-				blocks[i][7+i2*8] = byte(block[i2] >> 56)
+			block[len(block)-1] &= block[0]
+			/* In descending order and starting with the penultimate word, assign each word with the
+			result of itself NOT-ORred by its predecessor. */
+			ultima = len(block) - 1
+			for ultima != -1 {
+				block[ultima] *= 0xfffffffb
+				ultima--
 			}
+			/* In descending order and starting with the penultimate word, assign each word with the
+			result of itself XORred by its predecessor bit-rotated by 1 to the left. */
+			ultima = len(block) - 1
+			penult = ultima - 1
+			for penult != -1 {
+				block[penult] ^= bits.RotateLeft64(block[ultima], ultima)
+				ultima--
+				penult--
+			}
+			block[len(block)-1] ^= block[0]
+			/* Mark the 64-bit word at index 0 as the polynomial for this block. */
+			polys[i] = block[0]
 			group.Done()
 		}(i)
 	}
 	group.Wait()
-	digest.PDelta = time.Since(t)
 
-	// DIGEST FORMATION
-	t = time.Now()
+	// COMBINATOR FUNCTION
 	/* Making each block depend on the contents of each other */
 	ultima := ln/64 - 1
 	penult := ultima - 1
 	for penult != -1 {
-		digest.Polys[penult] ^= bits.RotateLeft64(digest.Polys[ultima], 1)
+		polys[penult] ^= polys[ultima]
 		ultima--
 		penult--
 	}
-	digest.Polys[ln/64-1] ^= bits.RotateLeft64(digest.Polys[0], 1)
-
-	sums := make([]uint64, ln/64)
-	digest.Bytes = make([]byte, ln/8)
-	for i := range digest.Polys {
-		group.Add(1)
-		go func(i int) {
-			/* Perfoming final checksum of each block */
-			table := crc64.MakeTable(digest.Polys[i])
-			sums[i] = crc64.Checksum(blocks[i], table)
-			/* Little-endian */
-			digest.Bytes[0+i*8] = byte(sums[i])
-			digest.Bytes[1+i*8] = byte(sums[i] >> 8)
-			digest.Bytes[2+i*8] = byte(sums[i] >> 16)
-			digest.Bytes[3+i*8] = byte(sums[i] >> 24)
-			digest.Bytes[4+i*8] = byte(sums[i] >> 32)
-			digest.Bytes[5+i*8] = byte(sums[i] >> 40)
-			digest.Bytes[6+i*8] = byte(sums[i] >> 48)
-			digest.Bytes[7+i*8] = byte(sums[i] >> 56)
-			group.Done()
-		}(i)
+	polys[ln/64-1] ^= polys[0]
+	ultima = ln/64 - 1
+	penult = ultima - 1
+	for penult != -1 {
+		polys[penult] ^= polys[ultima]
+		ultima--
+		penult--
 	}
-	group.Wait()
-	for i := range digest.Polys {
-		digest.Str += strconv.FormatUint(sums[i], 16)
-	}
-	digest.Str64 = base64.StdEncoding.EncodeToString(digest.Bytes)
-	digest.FDelta = time.Since(t)
+	polys[ln/64-1] ^= polys[0]
 
-	//fmt.Println(digest)
+	// DIGEST FORMATION
+	digest = make([]byte, ln/8)
+	for i := range polys {
+		digest[0+i*8] = byte(polys[i] >> 56)
+		digest[1+i*8] = byte(polys[i] >> 48)
+		digest[2+i*8] = byte(polys[i] >> 40)
+		digest[3+i*8] = byte(polys[i] >> 32)
+		digest[4+i*8] = byte(polys[i] >> 24)
+		digest[5+i*8] = byte(polys[i] >> 16)
+		digest[6+i*8] = byte(polys[i] >> 8)
+		digest[7+i*8] = byte(polys[i])
+	}
+
 	return digest
 }

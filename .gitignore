@@ -2,5 +2,5 @@
 /.idea/*
 build.fish
 /.tmp/*
-src.txz
+source.tar.xz
 go.sum
