@@ -15,32 +15,27 @@ utilized in this project. */
 
 func Sum(msg []byte, ln int) []byte {
 	/* Checks that the requested digest length meets the function's requirements */
-	if ln < 256 || ln%64 != 0 {
+	if ln < 256 || ln&63 != 0 {
 		panic("invalid input: digest length")
 	}
 	var (
 		message = msg
 		blocks  [][]byte
 		group   sync.WaitGroup
+		sums    = make([]uint64, ln>>6)
 		digest  []byte
 	)
 
 	// KEY EXTENSION FUNCTION
-	if len(message) < ln/2 {
+	if len(message) < ln>>1 {
 		var (
-			pop1    int
-			pop2    int
 			ceiling = len(primes) - 1
 			product = big.NewInt(0).SetBytes(message)
 			prime   = big.NewInt(0)
 			one     = big.NewInt(1)
 		)
-		for _, i := range product.Bits() {
-			pop1 += bits.OnesCount64(uint64(i))
-		}
-
 		product.Add(product, one) /* Makes input zero-insensitive */
-		for i := 0; product.BitLen() < ln*4; i++ {
+		for i := 1; product.BitLen() < ln<<2 || product.BitLen()&63 != 0; i++ {
 			if i > ceiling {
 				prime.Add(product, one)
 				for prime.ProbablyPrime(1) != true {
@@ -52,45 +47,36 @@ func Sum(msg []byte, ln int) []byte {
 			prime.SetUint64(primes[i])
 			product.Mul(product, prime)
 		}
-
-		for _, i := range product.Bits() {
-			pop2 += bits.OnesCount64(uint64(i))
-		}
-		if i := pop1*pop2; i > 0 {
-			offset := uint(i) & uint(product.BitLen()-1)
-			left := big.NewInt(0).Lsh(product, offset)
-			right := big.NewInt(0).Rsh(product, uint(product.BitLen())-offset)
-			product.Or(left, right)
-		}
 		message = product.Bytes()
 	}
+	/*file, _ := os.Create("same as 0B")
+	_, _ = file.Write(message)*/
 
 	// MESSAGE DIVISION
-	for len(message)%(ln/64) != 0 {
-		message = append(message, 0b01101101)
+	for len(message)&(ln>>6-1) != 0 {
+		message = append(message, 0b01011101)
 	}
-	bSize := len(message) / (ln / 64)
+	bSize := len(message) / (ln >> 6)
 	for len(message) != 0 {
 		blocks = append(blocks, message[:bSize])
 		message = message[bSize:]
 	}
 	for i := range blocks {
 		/* Supplemental expansion */
-		for len(blocks[i])%8 != 0 {
+		for len(blocks[i])&7 != 0 {
 			blocks[i] = append(blocks[i], 0b01101101)
 		}
 	}
 
 	// DIFFUSION FUNCTION
-	polys := make([]uint64, ln/64)
 	for i := range blocks {
 		group.Add(1)
 		go func(i int) {
 			/* Converts each block of bytes into a block of uint64's */
-			block := make([]uint64, bSize/8)
+			block := make([]uint64, bSize>>3)
 			for i2 := range block {
 				/* Little-endian */
-				block[i2] = *(*uint64)(unsafe.Pointer(&blocks[i][i2*8]))
+				block[i2] = *(*uint64)(unsafe.Pointer(&blocks[i][i2<<3]))
 			}
 
 			/* In descending order and starting with the penultimate word, assign each word with the
@@ -121,7 +107,7 @@ func Sum(msg []byte, ln int) []byte {
 			}
 			block[len(block)-1] ^= block[0]
 			/* Mark the 64-bit word at index 0 as the polynomial for this block. */
-			polys[i] = block[0]
+			sums[i] = block[0]
 			group.Done()
 		}(i)
 	}
@@ -129,34 +115,34 @@ func Sum(msg []byte, ln int) []byte {
 
 	// COMBINATOR FUNCTION
 	/* Making each block depend on the contents of each other */
-	ultima := ln/64 - 1
+	ultima := ln>>6 - 1
 	penult := ultima - 1
 	for penult != -1 {
-		polys[penult] ^= polys[ultima]
+		sums[penult] ^= sums[ultima]
 		ultima--
 		penult--
 	}
-	polys[ln/64-1] ^= polys[0]
-	ultima = ln/64 - 1
+	sums[ln>>6-1] ^= sums[0]
+	ultima = ln>>6 - 1
 	penult = ultima - 1
 	for penult != -1 {
-		polys[penult] ^= polys[ultima]
+		sums[penult] ^= sums[ultima]
 		ultima--
 		penult--
 	}
-	polys[ln/64-1] ^= polys[0]
+	sums[ln>>6-1] ^= sums[0]
 
 	// DIGEST FORMATION
-	digest = make([]byte, ln/8)
-	for i := range polys {
-		digest[0+i*8] = byte(polys[i] >> 56)
-		digest[1+i*8] = byte(polys[i] >> 48)
-		digest[2+i*8] = byte(polys[i] >> 40)
-		digest[3+i*8] = byte(polys[i] >> 32)
-		digest[4+i*8] = byte(polys[i] >> 24)
-		digest[5+i*8] = byte(polys[i] >> 16)
-		digest[6+i*8] = byte(polys[i] >> 8)
-		digest[7+i*8] = byte(polys[i])
+	digest = make([]byte, ln>>3)
+	for i := range sums {
+		digest[0+i<<3] = byte(sums[i] >> 56)
+		digest[1+i<<3] = byte(sums[i] >> 48)
+		digest[2+i<<3] = byte(sums[i] >> 40)
+		digest[3+i<<3] = byte(sums[i] >> 32)
+		digest[4+i<<3] = byte(sums[i] >> 24)
+		digest[5+i<<3] = byte(sums[i] >> 16)
+		digest[6+i<<3] = byte(sums[i] >> 8)
+		digest[7+i<<3] = byte(sums[i])
 	}
 
 	return digest
