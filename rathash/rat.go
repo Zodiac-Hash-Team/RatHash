@@ -25,12 +25,22 @@ func Sum(msg []byte, ln int) []byte {
 		digest  []byte
 	)
 
-	// KEY STRETCHING
+	// KEY EXTENSION FUNCTION
 	if len(message) < ln/2 {
-		ceiling := len(primes) - 1
-		product, prime, one := big.NewInt(0).SetBytes(message), big.NewInt(0), big.NewInt(1)
+		var (
+			pop1    int
+			pop2    int
+			ceiling = len(primes) - 1
+			product = big.NewInt(0).SetBytes(message)
+			prime   = big.NewInt(0)
+			one     = big.NewInt(1)
+		)
+		for _, i := range product.Bits() {
+			pop1 += bits.OnesCount64(uint64(i))
+		}
+
 		product.Add(product, one) /* Makes input zero-insensitive */
-		for i := 1; product.BitLen() < ln*4; i++ {
+		for i := 0; product.BitLen() < ln*4; i++ {
 			if i > ceiling {
 				prime.Add(product, one)
 				for prime.ProbablyPrime(1) != true {
@@ -42,12 +52,22 @@ func Sum(msg []byte, ln int) []byte {
 			prime.SetUint64(primes[i])
 			product.Mul(product, prime)
 		}
+
+		for _, i := range product.Bits() {
+			pop2 += bits.OnesCount64(uint64(i))
+		}
+		if i := pop1*pop2; i > 0 {
+			offset := uint(i) & uint(product.BitLen()-1)
+			left := big.NewInt(0).Lsh(product, offset)
+			right := big.NewInt(0).Rsh(product, uint(product.BitLen())-offset)
+			product.Or(left, right)
+		}
 		message = product.Bytes()
 	}
 
 	// MESSAGE DIVISION
 	for len(message)%(ln/64) != 0 {
-		message = append(message, 0x01)
+		message = append(message, 0b01101101)
 	}
 	bSize := len(message) / (ln / 64)
 	for len(message) != 0 {
@@ -57,7 +77,7 @@ func Sum(msg []byte, ln int) []byte {
 	for i := range blocks {
 		/* Supplemental expansion */
 		for len(blocks[i])%8 != 0 {
-			blocks[i] = append(blocks[i], 0x01)
+			blocks[i] = append(blocks[i], 0b01101101)
 		}
 	}
 
