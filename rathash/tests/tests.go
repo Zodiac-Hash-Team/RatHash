@@ -24,17 +24,16 @@ and mean bias per output bit. Furthermore, it benchmarks the relative throughput
 each algorithm. */
 
 const (
-	ints   = 5e4
-	passes = 3
-	kiB    = 1024
+	ints uint32 = 5e4
+	kiB         = 1024
 )
 
 var (
-	intBytes  = make([]byte, 4)
-	randBytes []byte
-	numbers   = map[uint32]*big.Int{}
-	random    = map[uint32]*big.Int{}
-	length    = 512
+	iBytes   = make([]byte, 4)
+	rBytes   []byte
+	integers = map[uint32]*big.Int{}
+	random   = map[uint32]*big.Int{}
+	length   = 512
 )
 
 func printMeanBias(hashes map[uint32]*big.Int, ln int) {
@@ -48,20 +47,20 @@ func printMeanBias(hashes map[uint32]*big.Int, ln int) {
 	}
 	var total float64
 	for i := range tally {
-		tally[i] = tally[i] - ints/2
+		tally[i] = tally[i] - float64(ints)/2
 		if tally[i] < 0 {
 			tally[i] *= -1
 		}
 		total += tally[i]
 	}
 	// fmt.Println(hashes)
-	fmt.Printf("%5.3f%%\n", (total/float64(ln))/(ints/2)*100)
+	fmt.Printf("%5.3f%%\n", (total/float64(ln))/float64(ints/2)*100)
 	// fmt.Println(tally)
 }
 
 func makeBytes(size int64) {
-	randBytes = make([]byte, size)
-	_, err := rand.Read(randBytes)
+	rBytes = make([]byte, size)
+	_, err := rand.Read(rBytes)
 	if err != nil {
 		panic("failed to generate random data")
 	}
@@ -74,64 +73,64 @@ func test(key string) {
 		if length < 256 {
 			length = 256
 		}
-		for i := uint32(ints) - 1; int32(i) > -1; i-- {
-			binary.BigEndian.PutUint32(intBytes, i)
-			numbers[i] = big.NewInt(0).SetBytes(rathash.Sum(intBytes, length))
-			makeBytes(kiB)
-			random[i] = big.NewInt(0).SetBytes(rathash.Sum(randBytes, length))
+		for i := ints - 1; int32(i) > -1; i-- {
+			binary.BigEndian.PutUint32(iBytes, i)
+			integers[i] = big.NewInt(0).SetBytes(rathash.Sum(iBytes, length))
+			makeBytes(kiB * 2)
+			random[i] = big.NewInt(0).SetBytes(rathash.Sum(rBytes, length))
 		}
 	case "fnv":
 		length = 128
-		for i := uint32(ints) - 1; int32(i) > -1; i-- {
-			binary.BigEndian.PutUint32(intBytes, i)
+		for i := ints - 1; int32(i) > -1; i-- {
+			binary.BigEndian.PutUint32(iBytes, i)
 			hash := fnv.New128a()
-			hash.Write(intBytes)
+			hash.Write(iBytes)
 			var tmp []byte
-			numbers[i] = big.NewInt(0).SetBytes(hash.Sum(tmp))
-			makeBytes(kiB)
-			hash.Write(randBytes)
+			integers[i] = big.NewInt(0).SetBytes(hash.Sum(tmp))
+			makeBytes(kiB * 2)
+			hash.Write(rBytes)
 			tmp = nil
 			random[i] = big.NewInt(0).SetBytes(hash.Sum(tmp))
 		}
 	case "sha1":
 		length = 160
-		for i := uint32(ints) - 1; int32(i) > -1; i-- {
-			binary.BigEndian.PutUint32(intBytes, i)
-			tmp := sha1.Sum(intBytes)
-			numbers[i] = big.NewInt(0).SetBytes(tmp[:])
-			makeBytes(kiB)
-			tmp = sha1.Sum(randBytes)
+		for i := ints - 1; int32(i) > -1; i-- {
+			binary.BigEndian.PutUint32(iBytes, i)
+			tmp := sha1.Sum(iBytes)
+			integers[i] = big.NewInt(0).SetBytes(tmp[:])
+			makeBytes(kiB * 2)
+			tmp = sha1.Sum(rBytes)
 			random[i] = big.NewInt(0).SetBytes(tmp[:])
 		}
 	case "sha2":
-		for i := uint32(ints) - 1; int32(i) > -1; i-- {
-			binary.BigEndian.PutUint32(intBytes, i)
-			tmp := sha512.Sum512(intBytes)
-			numbers[i] = big.NewInt(0).SetBytes(tmp[:])
-			makeBytes(kiB)
-			tmp = sha512.Sum512(randBytes)
+		for i := ints - 1; int32(i) > -1; i-- {
+			binary.BigEndian.PutUint32(iBytes, i)
+			tmp := sha512.Sum512(iBytes)
+			integers[i] = big.NewInt(0).SetBytes(tmp[:])
+			makeBytes(kiB * 2)
+			tmp = sha512.Sum512(rBytes)
 			random[i] = big.NewInt(0).SetBytes(tmp[:])
 		}
 	case "sha3":
-		for i := uint32(ints) - 1; int32(i) > -1; i-- {
-			binary.BigEndian.PutUint32(intBytes, i)
-			tmp := sha3.Sum512(intBytes)
-			numbers[i] = big.NewInt(0).SetBytes(tmp[:])
-			makeBytes(kiB)
-			tmp = sha3.Sum512(randBytes)
+		for i := ints - 1; int32(i) > -1; i-- {
+			binary.BigEndian.PutUint32(iBytes, i)
+			tmp := sha3.Sum512(iBytes)
+			integers[i] = big.NewInt(0).SetBytes(tmp[:])
+			makeBytes(kiB * 2)
+			tmp = sha3.Sum512(rBytes)
 			random[i] = big.NewInt(0).SetBytes(tmp[:])
 		}
 	case "blake3":
-		for i := uint32(ints) - 1; int32(i) > -1; i-- {
-			binary.BigEndian.PutUint32(intBytes, i)
-			tmp := blake3.Sum512(intBytes)
-			numbers[i] = big.NewInt(0).SetBytes(tmp[:])
-			makeBytes(kiB)
-			tmp = blake3.Sum512(randBytes)
+		for i := ints - 1; int32(i) > -1; i-- {
+			binary.BigEndian.PutUint32(iBytes, i)
+			tmp := blake3.Sum512(iBytes)
+			integers[i] = big.NewInt(0).SetBytes(tmp[:])
+			makeBytes(kiB * 2)
+			tmp = blake3.Sum512(rBytes)
 			random[i] = big.NewInt(0).SetBytes(tmp[:])
 		}
 	}
-	printMeanBias(numbers, length)
+	printMeanBias(integers, length)
 	printMeanBias(random, length)
 }
 
@@ -145,7 +144,7 @@ func rat(name string, size int64) {
 	fn := func(b *testing.B) {
 		b.SetBytes(size)
 		for i := b.N; i > 0; i-- {
-			_ = rathash.Sum(randBytes, length)
+			_ = rathash.Sum(rBytes, length)
 		}
 	}
 	r := testing.Benchmark(fn)
@@ -159,7 +158,7 @@ func b3(name string, size int64) {
 	fn := func(b *testing.B) {
 		b.SetBytes(size)
 		for i := b.N; i > 0; i-- {
-			_ = blake3.Sum512(randBytes)
+			_ = blake3.Sum512(rBytes)
 		}
 	}
 	r := testing.Benchmark(fn)

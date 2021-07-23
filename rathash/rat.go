@@ -18,28 +18,28 @@ func Sum(msg []byte, ln int) []byte {
 	if ln < 256 || ln&63 != 0 {
 		panic("invalid input: digest length")
 	}
+	const phiE19 uint64 = 16180339887498948482
 	var (
-		message = msg
-		blocks  [][]byte
-		group   sync.WaitGroup
-		sums    = make([]uint64, ln>>6)
-		digest  []byte
+		mSize = len(msg)
+		/* Initializes to zero, but *may* be modified prior to compression */
+		sums   = make([]uint64, ln>>6)
+		group  sync.WaitGroup
+		digest []byte
 	)
 
-	// KEY EXTENSION FUNCTION
-	if len(message) < ln>>1 {
-		var (
-			ceiling = len(primes) - 1
-			product = big.NewInt(0).SetBytes(message)
-			prime   = big.NewInt(0)
-			one     = big.NewInt(1)
-		)
-		product.Add(product, one) /* Makes input zero-insensitive */
+	// EXTENSION *OR* INITIALIZATION
+	const ceiling = len(primes) - 1
+	product, prime, two := big.NewInt(0), big.NewInt(0), big.NewInt(2)
+	if mSize < ln>>1 {
+		product.SetBytes(msg)
+		/* Makes input zero-insensitive */
+		product.Add(product, big.NewInt(0).SetUint64(phiE19))
+		/* Skips 2, because 2 bad */
 		for i := 1; product.BitLen() < ln<<2 || product.BitLen()&63 != 0; i++ {
 			if i > ceiling {
-				prime.Add(product, one)
+				prime.Add(prime, two)
 				for prime.ProbablyPrime(1) != true {
-					prime.Add(product, one)
+					prime.Add(prime, two)
 				}
 				product.Mul(product, prime)
 				continue
@@ -47,74 +47,98 @@ func Sum(msg []byte, ln int) []byte {
 			prime.SetUint64(primes[i])
 			product.Mul(product, prime)
 		}
-		message = product.Bytes()
-	}
-	/*file, _ := os.Create("same as 0B")
-	_, _ = file.Write(message)*/
-
-	// MESSAGE DIVISION
-	for len(message)&(ln>>6-1) != 0 {
-		message = append(message, 0b01011101)
-	}
-	bSize := len(message) / (ln >> 6)
-	for len(message) != 0 {
-		blocks = append(blocks, message[:bSize])
-		message = message[bSize:]
-	}
-	for i := range blocks {
-		/* Supplemental expansion */
-		for len(blocks[i])&7 != 0 {
-			blocks[i] = append(blocks[i], 0b01101101)
+		msg = product.Bytes() /* Doesn't allocate memory to store `msg` until this point */
+	} else {
+		product.SetUint64(phiE19)
+		/* Skips 2, because 2 bad */
+		for i := 1; product.BitLen() < ln; i++ {
+			if i > ceiling {
+				prime.Add(prime, two)
+				for prime.ProbablyPrime(1) != true {
+					prime.Add(prime, two)
+				}
+				product.Mul(product, prime)
+				continue
+			}
+			prime.SetUint64(primes[i])
+			product.Mul(product, prime)
+		}
+		tmp := product.Bytes()[:ln>>3] /* Truncates to the correct byte count */
+		for i := range sums {
+			/* Little-endian */
+			sums[i] = *(*uint64)(unsafe.Pointer(&tmp[i<<3]))
 		}
 	}
 
-	// DIFFUSION FUNCTION
-	for i := range blocks {
+	// PARALLEL COMPRESSION
+	mSize = len(msg)
+	bSize := (mSize + mSize%(ln>>6)) / (ln >> 6) /* len(msg)/(ln/64) rounded up */
+	rem := bSize & 7
+	for i := ln>>6 - 1; i >= 0; i-- {
 		group.Add(1)
 		go func(i int) {
-			/* Converts each block of bytes into a block of uint64's */
-			block := make([]uint64, bSize>>3)
-			for i2 := range block {
-				/* Little-endian */
-				block[i2] = *(*uint64)(unsafe.Pointer(&blocks[i][i2<<3]))
-			}
+			var val, pop, sum uint64
 
-			/* In descending order and starting with the penultimate word, assign each word with the
-			result of itself ANDed by its predecessor. */
-			ultima := len(block) - 1
-			penult := ultima - 1
-			for penult != -1 {
-				block[penult] &= block[ultima]
-				ultima--
-				penult--
+			switch rem {
+			case 7:
+				val = bits.Reverse64(uint64(msg[bSize*(i+1)-8])<<56) ^ phiE19 + sums[i]
+			case 6:
+				val = bits.Reverse64(
+					uint64(msg[bSize*(i+1)-8])<<56|
+						uint64(msg[bSize*(i+1)-7])<<48) ^ phiE19 + sums[i]
+			case 5:
+				val = bits.Reverse64(
+					uint64(msg[bSize*(i+1)-8])<<56|
+						uint64(msg[bSize*(i+1)-7])<<48|
+						uint64(msg[bSize*(i+1)-6])<<40) ^ phiE19 + sums[i]
+			case 4:
+				val = bits.Reverse64(
+					uint64(msg[bSize*(i+1)-8])<<56|
+						uint64(msg[bSize*(i+1)-7])<<48|
+						uint64(msg[bSize*(i+1)-6])<<40|
+						uint64(msg[bSize*(i+1)-5])<<32) ^ phiE19 + sums[i]
+			case 3:
+				val = bits.Reverse64(
+					uint64(msg[bSize*(i+1)-8])<<56|
+						uint64(msg[bSize*(i+1)-7])<<48|
+						uint64(msg[bSize*(i+1)-6])<<40|
+						uint64(msg[bSize*(i+1)-5])<<32|
+						uint64(msg[bSize*(i+1)-4])<<24) ^ phiE19 + sums[i]
+			case 2:
+				val = bits.Reverse64(
+					uint64(msg[bSize*(i+1)-8])<<56|
+						uint64(msg[bSize*(i+1)-7])<<48|
+						uint64(msg[bSize*(i+1)-6])<<40|
+						uint64(msg[bSize*(i+1)-5])<<32|
+						uint64(msg[bSize*(i+1)-4])<<24|
+						uint64(msg[bSize*(i+1)-3])<<16) ^ phiE19 + sums[i]
+			case 1:
+				val = bits.Reverse64(
+					uint64(msg[bSize*(i+1)-8])<<56|
+						uint64(msg[bSize*(i+1)-7])<<48|
+						uint64(msg[bSize*(i+1)-6])<<40|
+						uint64(msg[bSize*(i+1)-5])<<32|
+						uint64(msg[bSize*(i+1)-4])<<24|
+						uint64(msg[bSize*(i+1)-3])<<16|
+						uint64(msg[bSize*(i+1)-2])<<8) ^ phiE19 + sums[i]
+			default:
+				val = *(*uint64)(unsafe.Pointer(&msg[bSize*(i+1)-7])) + sums[i]
 			}
-			block[len(block)-1] &= block[0]
-			/* In descending order and starting with the penultimate word, assign each word with the
-			result of itself NOT-ORred by its predecessor. */
-			ultima = len(block) - 1
-			for ultima != -1 {
-				block[ultima] *= 0xfffffffb
-				ultima--
+			pop = uint64(bits.OnesCount64(val))
+			sum ^= pop * pop * val
+
+			for i2 := bSize>>3 - 2; i2 >= 0; i2-- {
+				val = *(*uint64)(unsafe.Pointer(&msg[i*bSize+i2<<3])) + sums[i]
+				pop = uint64(bits.OnesCount64(val))
+				sum ^= pop * pop * val
 			}
-			/* In descending order and starting with the penultimate word, assign each word with the
-			result of itself XORred by its predecessor bit-rotated by 1 to the left. */
-			ultima = len(block) - 1
-			penult = ultima - 1
-			for penult != -1 {
-				block[penult] ^= bits.RotateLeft64(block[ultima], ultima)
-				ultima--
-				penult--
-			}
-			block[len(block)-1] ^= block[0]
-			/* Mark the 64-bit word at index 0 as the polynomial for this block. */
-			sums[i] = block[0]
+			sums[i] = sum
 			group.Done()
 		}(i)
 	}
 	group.Wait()
 
-	// COMBINATOR FUNCTION
-	/* Making each block depend on the contents of each other */
+	// COMBINATION & DIGEST FORMATION
 	ultima := ln>>6 - 1
 	penult := ultima - 1
 	for penult != -1 {
@@ -132,7 +156,6 @@ func Sum(msg []byte, ln int) []byte {
 	}
 	sums[ln>>6-1] ^= sums[0]
 
-	// DIGEST FORMATION
 	digest = make([]byte, ln>>3)
 	for i := range sums {
 		digest[0+i<<3] = byte(sums[i] >> 56)
