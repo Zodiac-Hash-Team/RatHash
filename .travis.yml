@@ -1,12 +1,15 @@
 language: go
 go: master
+os: linux
+dist: bionic
 
 jobs:
   include:
     - stage: Test
-      arch:
-        - amd64
-        - arm64
+      arch: amd64
+      script: "go run ./rathash/tests"
+    - stage: Test
+      arch: arm64
       script: "go run ./rathash/tests"
     - stage: Package for Release
       script:
