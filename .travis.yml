@@ -6,26 +6,25 @@ dist: bionic
 jobs:
   include:
     - stage: Test
-      arch: amd64
-      script: "go run ./rathash/tests"
-    - stage: Test
       arch: arm64
       script: "go run ./rathash/tests"
+
+    - stage: Test
+      arch: amd64
+      script: "go run ./rathash/tests"
+
     - stage: Package for Release
+      arch: arm64
       script:
-        - go env -w GOOS=darwin GOARCH=arm64 CGO_ENABLED=0
-        - go build -o build/rathash-darwin-arm64 .
-        - go build -o build/tests-darwin-arm64 ./rathash/tests
-        - go env -w GOOS=linux
-        - go build -o build/rathash-linux-arm64 .
-        - go build -o build/tests-linux-arm64 ./rathash/tests
-        - go env -w GOARCH=amd64
-        - go build -o build/rathash-linux-amd64 .
-        - go build -o build/tests-linux-amd64 ./rathash/tests
-        - go env -w GOOS=windows
-        - go build -o build/rathash-windows-amd64.exe .
-        - go build -o build/tests-windows-amd64.exe ./rathash/tests
-      before_deploy: "ls -Ash build"
+        - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o build/rathash-darwin-arm64 .
+        - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o build/tests-darwin-arm64 ./rathash/tests
+        - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/rathash-linux-arm64 .
+        - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/tests-linux-arm64 ./rathash/tests
+        - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/rathash-linux-amd64 .
+        - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/tests-linux-amd64 ./rathash/tests
+        - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o build/rathash-windows-amd64.exe .
+        - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o build/tests-windows-amd64.exe ./rathash/tests
+        - ls -Ash build
       deploy:
         provider: releases
         prerelease: true
