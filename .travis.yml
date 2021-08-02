@@ -1,0 +1,35 @@
+language: go
+go: master
+
+jobs:
+  include:
+    - stage: Test
+      arch:
+        - amd64
+        - arm64
+      script: "go run ./rathash/tests"
+    - stage: Package for Release
+      script:
+        - go env -w GOOS=darwin GOARCH=arm64 CGO_ENABLED=0
+        - go build -o build/rathash-darwin-arm64 .
+        - go build -o build/tests-darwin-arm64 ./rathash/tests
+        - go env -w GOOS=linux
+        - go build -o build/rathash-linux-arm64 .
+        - go build -o build/tests-linux-arm64 ./rathash/tests
+        - go env -w GOARCH=amd64
+        - go build -o build/rathash-linux-amd64 .
+        - go build -o build/tests-linux-amd64 ./rathash/tests
+        - go env -w GOOS=windows
+        - go build -o build/rathash-windows-amd64.exe .
+        - go build -o build/tests-windows-amd64.exe ./rathash/tests
+      before_deploy: "ls -Ash build"
+      deploy:
+        provider: releases
+        prerelease: true
+        token:
+          secure: kcnn5sPj/TQf0Uce0nnRBcY7spfRyTVH0WmgJUg5mMOSnbmyM2Ckv8R8+rmFLVkINXmOUXbIHVHku2e1oN2XxVVrycVNV3y/jWxGD47VWKelytMjvjtffLVUcToHCflPK5cGaVfyLlNX94loWQGQGgQmyBcFAdxg4adw7AEdMqJewKsBFKOS7HwE8QSTJLLQwcpYpF9DSwyHqX0C3o9juuznfg8w0Mjuqr1bgh52r078N8aWuU03WJdNg7MKQVZeLOpeVkHM0h0jOCRPOpjLKzAVg+eT1RhgA3fL9sa+lTqEeHVB4IIgh2jwp3e4tH+7ttR6ZR9yBOnKCqRVc0m7iyjx4l6Au49CNmYMbPCK2Q2JWCMuGDS7LCQXnyxlE/pixO4YD4inqKNkLY2PLothH5V3BRHKP1v+SA8Rm5JqTvTDYPaHswpjCfQF+oUnFHOEDrNbiDRULUjQmpKAetL437F0UK3k/NvxT0JG/ps4s9AMNHwlAUcYhd1KhaYi+AU1QcPaUNhiPKaEX02dA0myr3HNuEAfVPJgsMvMhSafiFC1F6qelK0kQZNI0swKbXGQvIb+aqkgDNVLVvXaU/+ZHeiZT63LBiYmcR1/PPIPNm2cpjzb6WbU7zhZafEUVOrQjUlovhvlAR9WziLzMR22jeaup3w3kvgzVPr8gAmyd9c=
+        file_glob: true
+        file: build/*
+        on:
+          tags: true
+        edge: true

@@ -1,6 +1,6 @@
 package rathash
 
-// Copyright © 2021 Matthew R Bonnette. Openly-licensed under a BSD-3-Clause license.
+// Copyright © 2021 Matthew R Bonnette. Licensed under a BSD-3-Clause license.
 /* This file contains a speedy lookup table of first 10000 primes, as required by the key stretching
 function for RatHash that increases the length of small message inputs in a seemingly random way. */
 

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Copyright © 2021 Matthew R Bonnette. Openly-licensed under a BSD-3-Clause license.
+// Copyright © 2021 Matthew R Bonnette. Licensed under a BSD-3-Clause license.
 /* The code in this file is what allows this hash function to be used as a program: It handles
 command-line flags and arguments, processing files as required by the command-line operator. It also
 enables the printing of a help menu. */
