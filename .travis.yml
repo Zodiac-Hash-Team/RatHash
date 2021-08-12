@@ -7,23 +7,23 @@ jobs:
   include:
     - stage: Test
       arch: arm64
-      script: "go run ./rathash/tests"
+      script: "go run ./statz"
 
     - stage: Test
       arch: amd64
-      script: "go run ./rathash/tests"
+      script: "go run ./statz"
 
     - stage: Package for Release
       arch: arm64
       script:
         - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o build/rathash-darwin-arm64 .
-        - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o build/tests-darwin-arm64 ./rathash/tests
+        - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o build/statz-darwin-arm64 ./statz
         - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/rathash-linux-arm64 .
-        - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/tests-linux-arm64 ./rathash/tests
+        - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/statz-linux-arm64 ./statz
         - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/rathash-linux-amd64 .
-        - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/tests-linux-amd64 ./rathash/tests
+        - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/statz-linux-amd64 ./statz
         - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o build/rathash-windows-amd64.exe .
-        - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o build/tests-windows-amd64.exe ./rathash/tests
+        - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o build/statz-windows-amd64.exe ./statz
         - ls -Ash build
       deploy:
         provider: releases
