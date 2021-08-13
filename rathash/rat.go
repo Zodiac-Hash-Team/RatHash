@@ -18,7 +18,7 @@ func Sum(msg []byte, ln int) []byte {
 	if ln < 256 || ln&63 != 0 {
 		panic("invalid input: digest length")
 	}
-	const phiE19 uint64 = 16180339887498948482
+	const phiE19 uint64 = 16180339887498948482 /* In decimal for quick visual verification */
 	var (
 		mSize = len(msg)
 		/* Initializes to zero, but *may* be modified prior to compression */
@@ -31,8 +31,9 @@ func Sum(msg []byte, ln int) []byte {
 	const ceiling = len(primes) - 1
 	if mSize < ln>>1 {
 		/* For small inputs, the algorithm is made sensitive to length-extension and insensitive to
-		all-zero inputs by prepending `msg` with the bytes of phiE19. */
-		msg = append([]byte{224, 140, 29, 102, 139, 117, 111, 130}, msg...)
+		all-zero inputs by prepending `msg` with the bytes of phiE19—they are in hexadecimel for
+		quick visual verification. */
+		msg = append([]byte{0xe0, 0x8c, 0x1d, 0x66, 0x8b, 0x75, 0x6f, 0x82}, msg...)
 		product, prime, two := big.NewInt(0).SetBytes(msg), big.NewInt(0), big.NewInt(2)
 		for i := 1; product.BitLen() < ln<<2 || product.BitLen()&63 != 0; i++ {
 			if i > ceiling {

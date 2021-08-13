@@ -1,5 +1,7 @@
 github.com/dterei/gotsc v0.0.0-20160722215413-e78f872945c6 h1:iD62k/20LzNdTc2bmrOTQ4xgRbI0uJvOxTkEAmd20eQ=
 github.com/dterei/gotsc v0.0.0-20160722215413-e78f872945c6/go.mod h1:P4N3xGqi52atrdlMBXpsAGTqRnLgZ8uDhlkQ7HEYGgo=
+github.com/p7r0x7/vainpath v0.1.0 h1:oRbxKfOmXjzwNGv6xIIEpiOCgMoVMfQXxXqjkWyCllc=
+github.com/p7r0x7/vainpath v0.1.0/go.mod h1:kYGt0+RuwGKeZiJ1Gpf5BW5fSONT9VrSBK53AVfDnTo=
 github.com/spf13/pflag v1.0.5 h1:iy+VFUOCP1a+8yFto/drg2CJ5u0yRoB7fZw3DKv/JXA=
 github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
 github.com/zeebo/assert v1.1.0 h1:hU1L1vLTHsnO8x8c9KAR5GmM5QscxHg5RNU5z5qbUWY=
