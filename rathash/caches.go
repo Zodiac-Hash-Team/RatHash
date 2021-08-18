@@ -1,8 +1,8 @@
 package rathash
 
 // Copyright © 2021 Matthew R Bonnette. Licensed under a BSD-3-Clause license.
-/* This file contains a speedy lookup table of first 20000 primes, as required by the key stretching
-function of RatHash that increases the length of small message inputs in a seemingly random way. */
+// This file contains a speedy lookup table of first 20000 primes, as required by the key stretching
+// function of RatHash that increases the length of small message inputs in a seemingly random way.
 
 var primes = [20000]uint64{
 	2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37,

@@ -14,11 +14,11 @@ import (
 )
 
 // Copyright © 2021 Matthew R Bonnette. Licensed under a BSD-3-Clause license.
-/* This program is the hardly-rigorous testing suite for the Go implementation of the RatHash
-function in direct comparison to other, properly-vetted cryptographic hashing algorithms. It aims to
-test the following characteristics: deterministicness, extremely short-term collision-resistance,
-and mean bias per output bit. Furthermore, it benchmarks the relative throughput and memory usage of
-each algorithm. */
+// This program is the hardly-rigorous testing suite for the Go implementation of the RatHash
+// function in direct comparison to other, properly-vetted cryptographic hashing algorithms. It aims
+// to test the following characteristics: deterministicness, extremely short-term collision-
+// resistance, and mean bias per output bit. Furthermore, it benchmarks the relative throughput and
+// memory usage of each algorithm.
 
 const ints = uint32(5e4)
 
@@ -37,7 +37,7 @@ var (
 			b.SetBytes(size)
 			b.ResetTimer()
 			for i := b.N; i > 0; i-- {
-				_ = rathash.Sum(rBytes, length)
+				rathash.Sum(rBytes, nil, length)
 			}
 		},
 		func(b *testing.B) {
@@ -45,7 +45,7 @@ var (
 			b.SetBytes(size)
 			b.ResetTimer()
 			for i := b.N; i > 0; i-- {
-				_ = sha512.Sum512(rBytes)
+				sha512.Sum512(rBytes)
 			}
 		},
 		func(b *testing.B) {
@@ -53,7 +53,7 @@ var (
 			b.SetBytes(size)
 			b.ResetTimer()
 			for i := b.N; i > 0; i-- {
-				_ = blake3.Sum512(rBytes)
+				blake3.Sum512(rBytes)
 			}
 		},
 	}
@@ -65,6 +65,22 @@ func makeBytes(size int64) {
 	if err != nil {
 		panic("failed to generate random data")
 	}
+}
+
+func rngBench() {
+	/*
+	fn := func(b *testing.B) {
+		rathash.RNGInit()
+		b.SetBytes(8)
+		b.ResetTimer()
+		for i := b.N; i > 0; i-- {
+			rathash.RNGNext()
+		}
+	}
+	r := testing.Benchmark(fn)
+	speed := float64(r.Bytes*int64(r.N)) / float64(r.T.Nanoseconds()) * 1e3
+	fmt.Printf("RatRNG             %7.5g  MB/s %7.5g  B/op\n", speed, float64(r.AllocedBytesPerOp()))
+	*/
 }
 
 func algBench(alg int) {
@@ -109,8 +125,12 @@ func algBench(alg int) {
 		fmt.Printf("         %7.5g %7.5g %7.5g %7.5g  cpb\n",
 			speeds[0], speeds[1], speeds[2], speeds[3])
 	}
-	fmt.Printf("Usage    %7.5g %7.5g %7.5g %7.5g  B/op\n\n",
+	fmt.Printf("Usage    %7.5g %7.5g %7.5g %7.5g  B/op\n",
 		usages[0], usages[1], usages[2], usages[3])
+	if alg == 0 {
+		rngBench()
+	}
+	fmt.Println()
 }
 
 func main() {
@@ -123,7 +143,7 @@ func main() {
 			b.SetBytes(size)
 			b.ResetTimer()
 			for i := b.N; i > 0; i-- {
-				_ = sha256.Sum256(rBytes)
+				sha256.Sum256(rBytes)
 			}
 		}
 	}

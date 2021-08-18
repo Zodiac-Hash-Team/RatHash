@@ -38,7 +38,6 @@ func main() {
 	if runtime.GOOS == "windows" || noFormat || quiet {
 		yell, purp, und, zero = "", "", "", ""
 	}
-
 	pHelp := pflag.BoolP("help", "h", false, purp+"prints this help menu"+zero+"\n")
 
 	pBase64 := pflag.BoolP("base64", "b", false, purp+"renders digest as base64 string"+zero+" (default hex string)")
@@ -52,7 +51,6 @@ func main() {
 	pString := pflag.BoolP("string", "s", false, purp+"process arguments instead as strings to be hashed"+zero)
 
 	pTime := pflag.BoolP("time", "t", false, purp+"prints time taken to process each message"+zero)
-
 	/* Ordered alphabetically except for help, which is hoisted to the top. */
 	pflag.CommandLine.SortFlags = false
 	pflag.Parse()
@@ -100,9 +98,9 @@ func main() {
 		}
 
 		t := time.Now()
-		digest := rathash.Sum(message, *pLength)
+		digest := rathash.Sum(message, nil, *pLength)
 		delta := time.Since(t).String()
-		str := Sprintf("%0x", digest)
+		str := Sprintf("%x", digest)
 		if *pBase64 {
 			str = base64.StdEncoding.EncodeToString(digest)
 		}
