@@ -1,5 +1,5 @@
 language: go
-go: 1.16.x
+go: 1.16.x # Waiting for go1.17 to fix its arm64 build issues…
 os: linux
 dist: bionic
 

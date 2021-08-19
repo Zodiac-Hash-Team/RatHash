@@ -67,22 +67,6 @@ func makeBytes(size int64) {
 	}
 }
 
-func rngBench() {
-	/*
-	fn := func(b *testing.B) {
-		rathash.RNGInit()
-		b.SetBytes(8)
-		b.ResetTimer()
-		for i := b.N; i > 0; i-- {
-			rathash.RNGNext()
-		}
-	}
-	r := testing.Benchmark(fn)
-	speed := float64(r.Bytes*int64(r.N)) / float64(r.T.Nanoseconds()) * 1e3
-	fmt.Printf("RatRNG             %7.5g  MB/s %7.5g  B/op\n", speed, float64(r.AllocedBytesPerOp()))
-	*/
-}
-
 func algBench(alg int) {
 	switch alg {
 	case 0:
@@ -125,12 +109,8 @@ func algBench(alg int) {
 		fmt.Printf("         %7.5g %7.5g %7.5g %7.5g  cpb\n",
 			speeds[0], speeds[1], speeds[2], speeds[3])
 	}
-	fmt.Printf("Usage    %7.5g %7.5g %7.5g %7.5g  B/op\n",
+	fmt.Printf("Usage    %7.5g %7.5g %7.5g %7.5g  B/op\n\n",
 		usages[0], usages[1], usages[2], usages[3])
-	if alg == 0 {
-		rngBench()
-	}
-	fmt.Println()
 }
 
 func main() {
