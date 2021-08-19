@@ -45,8 +45,7 @@ func (z *zipper) seed(a, b uint64) {
 // sequence based on `z` using David Blackman's and Sebastiano Vigna's xoshiro256** PRNG algorithm.
 // The original source can be found at https://xoroshiro.di.unimi.it/xoshiro256starstar.c.
 func (z *zipper) next() uint64 {
-	s0, s1, s2, s3 :=
-		z.s[0], z.s[1], z.s[2], z.s[3]
+	s0, s1, s2, s3 := z.s[0], z.s[1], z.s[2], z.s[3]
 	z.s[0] = s0 ^ s3 ^ s1
 	z.s[1] = s1 ^ s2 ^ s0
 	z.s[2] = (s1 << 17) ^ s2 ^ s0
@@ -54,7 +53,37 @@ func (z *zipper) next() uint64 {
 	return bits.RotateLeft64(s1*5, 7) * 9
 }
 
-func halfsum(msg []byte, ln int) []uint64 {
+func Sum(msg, mac []byte, ln int) []byte {
+	var sum1, sum2 []byte
+	if mac != nil {
+		/* MACs called to the function must be at least the size of the output. */
+		if len(mac) < ln>>3 {
+			panic("invalid input: MAC length too short")
+		} else {
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() {
+				sum1 = halfsum(msg, ln)
+				wg.Done()
+			}()
+			go func() {
+				sum2 = halfsum(mac, ln)
+				wg.Done()
+			}()
+			wg.Wait()
+		}
+	} else {
+		sum1 = halfsum(msg, ln)
+		sum2 = halfsum(sum1, ln)
+	}
+	for i := ln>>3 - 1; i >= 0; i-- {
+		sum1[i] ^= sum2[i]
+	}
+
+	return sum1
+}
+
+func halfsum(msg []byte, ln int) []byte {
 	/* Checks that the requested digest length meets the function's requirements */
 	if ln < 256 || ln&63 != 0 {
 		panic("invalid input: digest length")
@@ -180,58 +209,17 @@ func halfsum(msg []byte, ln int) []uint64 {
 	}
 	wg.Wait()
 
-	return sums
-}
-
-func Sum(msg, mac []byte, ln int) []byte {
-	var sum1, sum2 []uint64
-	if mac != nil {
-		/* MACs called to the function must be at least the size of the output. */
-		if len(mac) < ln>>3 {
-			panic("invalid input: MAC length too short")
-		} else {
-			var wg sync.WaitGroup
-			wg.Add(2)
-			go func() {
-				sum1 = halfsum(msg, ln)
-				wg.Done()
-			}()
-			go func() {
-				sum2 = halfsum(mac, ln)
-				wg.Done()
-			}()
-			wg.Wait()
-		}
-	} else {
-		sum1 = halfsum(msg, ln)
-		tmp := make([]byte, ln>>3)
-		for i := ln>>6 - 1; i >= 0; i-- {
-			tmp[0+i<<3] = byte(sum1[i] >> 56)
-			tmp[1+i<<3] = byte(sum1[i] >> 48)
-			tmp[2+i<<3] = byte(sum1[i] >> 40)
-			tmp[3+i<<3] = byte(sum1[i] >> 32)
-			tmp[4+i<<3] = byte(sum1[i] >> 24)
-			tmp[5+i<<3] = byte(sum1[i] >> 16)
-			tmp[6+i<<3] = byte(sum1[i] >> 8)
-			tmp[7+i<<3] = byte(sum1[i])
-		}
-		sum2 = halfsum(tmp, ln)
-	}
-	for i := ln>>6 - 1; i >= 0; i-- {
-		sum1[i] ^= sum2[i]
-	}
-
 	// DIGEST FORMATION
 	digest := make([]byte, ln>>3)
 	for i := ln>>6 - 1; i >= 0; i-- {
-		digest[0+i<<3] = byte(sum1[i] >> 56)
-		digest[1+i<<3] = byte(sum1[i] >> 48)
-		digest[2+i<<3] = byte(sum1[i] >> 40)
-		digest[3+i<<3] = byte(sum1[i] >> 32)
-		digest[4+i<<3] = byte(sum1[i] >> 24)
-		digest[5+i<<3] = byte(sum1[i] >> 16)
-		digest[6+i<<3] = byte(sum1[i] >> 8)
-		digest[7+i<<3] = byte(sum1[i])
+		digest[0+i<<3] = byte(sums[i] >> 56)
+		digest[1+i<<3] = byte(sums[i] >> 48)
+		digest[2+i<<3] = byte(sums[i] >> 40)
+		digest[3+i<<3] = byte(sums[i] >> 32)
+		digest[4+i<<3] = byte(sums[i] >> 24)
+		digest[5+i<<3] = byte(sums[i] >> 16)
+		digest[6+i<<3] = byte(sums[i] >> 8)
+		digest[7+i<<3] = byte(sums[i])
 	}
 
 	return digest

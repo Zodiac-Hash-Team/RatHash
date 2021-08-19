@@ -5,11 +5,11 @@ dist: bionic
 
 jobs:
   include:
-    - stage: Test
+    - stage: Run Statz
       arch: arm64
       script: "go run ./statz"
 
-    - stage: Test
+    - stage: Run Statz
       arch: amd64
       script: "go run ./statz"
 
