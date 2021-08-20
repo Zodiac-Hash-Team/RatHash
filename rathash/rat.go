@@ -13,43 +13,47 @@ import (
 // author. RatHash's developer thanks The Go Authors and the developers of any third-party software
 // utilized in this project.
 
-type zipper struct {
-	s [4]uint64
+type xoshiro struct {
+	s0, s1, s2, s3 uint64
 }
 
 // Method seed overwrites the current internal state of `z` using a variation of Sebastiano Vigna's
 // SplitMix64 PRNG algorithm with seeds `a` and `b`; its outcome is dependent on the previous state.
 // The original source can be found at https://xoroshiro.di.unimi.it/splitmix64.c.
-func (z *zipper) seed(a, b uint64) {
-	const one, two, three = 0x9e3779b97f4a7c15, 0xbf58476d1ce4e5b9, 0x94d049bb133111eb
-	z.s[0] ^= a + one
-	z.s[0] = (z.s[0] ^ z.s[0]>>30) * two
-	z.s[0] = (z.s[0] ^ z.s[0]>>27) * three
-	z.s[0] ^= z.s[0] >> 31
-	z.s[1] ^= a + one + one
-	z.s[1] = (z.s[1] ^ z.s[1]>>30) * two
-	z.s[1] = (z.s[1] ^ z.s[1]>>27) * three
-	z.s[1] ^= z.s[1] >> 31
+func (x *xoshiro) seed(a, b uint64) {
+	const up, charm, top = 30, 27, 31
+	const down, strange, bottom = 0x9e3779b97f4a7c15, 0xbf58476d1ce4e5b9, 0x94d049bb133111eb
 
-	z.s[2] ^= b + one
-	z.s[2] = (z.s[2] ^ z.s[2]>>30) * two
-	z.s[2] = (z.s[2] ^ z.s[2]>>27) * three
-	z.s[2] ^= z.s[2] >> 31
-	z.s[3] ^= b + one + one
-	z.s[3] = (z.s[3] ^ z.s[3]>>30) * two
-	z.s[3] = (z.s[3] ^ z.s[3]>>27) * three
-	z.s[3] ^= z.s[3] >> 31
+	s0 := x.s0 ^ a + down
+	s0 = (s0 ^ s0>>up) * strange
+	s0 = (s0 ^ s0>>charm) * bottom
+	x.s0 = s0 ^ s0 >> top
+
+	s1 := x.s1 ^ a + down + down
+	s1 = (s1 ^ s1>>up) * strange
+	s1 = (s1 ^ s1>>charm) * bottom
+	x.s1 = s1 ^ s1 >> top
+
+	s2 := x.s2 ^ b + down
+	s2 = (s2 ^ s2>>up) * strange
+	s2 = (s2 ^ s2>>charm) * bottom
+	x.s2 = s2 ^ s2 >> top
+
+	s3 := x.s3 ^ b + down + down
+	s3 = (s3 ^ s3>>up) * strange
+	s3 = (s3 ^ s3>>charm) * bottom
+	x.s3 = s3 ^ s3 >> top
 }
 
 // Method next updates the internal state of and returns the next value in the deterministic
 // sequence based on `z` using David Blackman's and Sebastiano Vigna's xoshiro256** PRNG algorithm.
 // The original source can be found at https://xoroshiro.di.unimi.it/xoshiro256starstar.c.
-func (z *zipper) next() uint64 {
-	s0, s1, s2, s3 := z.s[0], z.s[1], z.s[2], z.s[3]
-	z.s[0] = s0 ^ s3 ^ s1
-	z.s[1] = s1 ^ s2 ^ s0
-	z.s[2] = (s1 << 17) ^ s2 ^ s0
-	z.s[3] = bits.RotateLeft64(s3^s1, 45)
+func (x *xoshiro) next() uint64 {
+	s0, s1, s2, s3 := x.s0, x.s1, x.s2, x.s3
+	x.s0 ^= s3 ^ s1
+	x.s1 ^= s2 ^ s0
+	x.s2 ^= s0 ^ s1 << 17
+	x.s3 = bits.RotateLeft64(s3^s1, 45)
 	return bits.RotateLeft64(s1*5, 7) * 9
 }
 
@@ -138,64 +142,61 @@ func halfsum(msg []byte, ln int) []byte {
 	for i := ln>>6 - 1; i >= 0; i-- {
 		wg.Add(1)
 		go func(i int) {
-			var word uint64
-			bRem, sum := mRem/8, sums[i]
+			sum, prng, bRem := sums[i], new(xoshiro), mRem/8
 
 			if i == ln>>6-1 {
 				switch rem {
 				case 7:
-					word = bits.ReverseBytes64(
-						uint64(msg[bSize*(i+1)-7])<<56) ^ phiE19
+					prng.seed(sum, bits.ReverseBytes64(
+						uint64(msg[bSize*(i+1)-7])<<56)^phiE19)
 				case 6:
-					word = bits.ReverseBytes64(
+					prng.seed(sum, bits.ReverseBytes64(
 						uint64(msg[bSize*(i+1)-7])<<56|
-							uint64(msg[bSize*(i+1)-6])<<48) ^ phiE19
+							uint64(msg[bSize*(i+1)-6])<<48)^phiE19)
 				case 5:
-					word = bits.ReverseBytes64(
+					prng.seed(sum, bits.ReverseBytes64(
 						uint64(msg[bSize*(i+1)-7])<<56|
 							uint64(msg[bSize*(i+1)-6])<<48|
-							uint64(msg[bSize*(i+1)-5])<<40) ^ phiE19
+							uint64(msg[bSize*(i+1)-5])<<40)^phiE19)
 				case 4:
-					word = bits.ReverseBytes64(
+					prng.seed(sum, bits.ReverseBytes64(
 						uint64(msg[bSize*(i+1)-7])<<56|
 							uint64(msg[bSize*(i+1)-6])<<48|
 							uint64(msg[bSize*(i+1)-5])<<40|
-							uint64(msg[bSize*(i+1)-4])<<32) ^ phiE19
+							uint64(msg[bSize*(i+1)-4])<<32)^phiE19)
 				case 3:
-					word = bits.ReverseBytes64(
+					prng.seed(sum, bits.ReverseBytes64(
 						uint64(msg[bSize*(i+1)-7])<<56|
 							uint64(msg[bSize*(i+1)-6])<<48|
 							uint64(msg[bSize*(i+1)-5])<<40|
 							uint64(msg[bSize*(i+1)-4])<<32|
-							uint64(msg[bSize*(i+1)-3])<<24) ^ phiE19
+							uint64(msg[bSize*(i+1)-3])<<24)^phiE19)
 				case 2:
-					word = bits.ReverseBytes64(
+					prng.seed(sum, bits.ReverseBytes64(
 						uint64(msg[bSize*(i+1)-7])<<56|
 							uint64(msg[bSize*(i+1)-6])<<48|
 							uint64(msg[bSize*(i+1)-5])<<40|
 							uint64(msg[bSize*(i+1)-4])<<32|
 							uint64(msg[bSize*(i+1)-3])<<24|
-							uint64(msg[bSize*(i+1)-2])<<16) ^ phiE19
+							uint64(msg[bSize*(i+1)-2])<<16)^phiE19)
 				case 1:
-					word = bits.ReverseBytes64(
+					prng.seed(sum, bits.ReverseBytes64(
 						uint64(msg[bSize*(i+1)-7])<<56|
 							uint64(msg[bSize*(i+1)-6])<<48|
 							uint64(msg[bSize*(i+1)-5])<<40|
 							uint64(msg[bSize*(i+1)-4])<<32|
 							uint64(msg[bSize*(i+1)-3])<<24|
 							uint64(msg[bSize*(i+1)-2])<<16|
-							uint64(msg[bSize*(i+1)-1])<<8) ^ phiE19
+							uint64(msg[bSize*(i+1)-1])<<8)^phiE19)
 				default:
 					/* Little-endian byte order */
-					word = *(*uint64)(unsafe.Pointer(&msg[bSize*(i+1)-7]))
+					prng.seed(sum, *(*uint64)(unsafe.Pointer(&msg[bSize*(i+1)-7])))
 				}
 			} else {
 				/* Little-endian byte order */
-				word = *(*uint64)(unsafe.Pointer(&msg[bSize*(i+1)-7]))
+				prng.seed(sum, *(*uint64)(unsafe.Pointer(&msg[bSize*(i+1)-7])))
 				bRem = 0
 			}
-			prng := new(zipper)
-			prng.seed(sum, word)
 			sum += prng.next() ^ prng.next() ^ prng.next() ^ prng.next()
 
 			for i2 := bSize>>3 + bRem - 2; i2 >= 0; i2-- {
