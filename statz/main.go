@@ -37,7 +37,7 @@ var (
 			b.SetBytes(size)
 			b.ResetTimer()
 			for i := b.N; i > 0; i-- {
-				rathash.Sum(rBytes, nil, length)
+				rathash.Sum(rBytes, length)
 			}
 		},
 		func(b *testing.B) {

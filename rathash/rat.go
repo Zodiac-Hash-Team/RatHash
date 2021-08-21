@@ -24,25 +24,25 @@ func (x *xoshiro) seed(a, b uint64) {
 	const up, charm, top = 30, 27, 31
 	const down, strange, bottom = 0x9e3779b97f4a7c15, 0xbf58476d1ce4e5b9, 0x94d049bb133111eb
 
-	s0 := x.s0 ^ a + down
+	s0 := x.s0 + a + down
 	s0 = (s0 ^ s0>>up) * strange
 	s0 = (s0 ^ s0>>charm) * bottom
-	x.s0 = s0 ^ s0 >> top
+	x.s0 = s0 ^ s0>>top
 
-	s1 := x.s1 ^ a + down + down
+	s1 := x.s1 + a + down + down
 	s1 = (s1 ^ s1>>up) * strange
 	s1 = (s1 ^ s1>>charm) * bottom
-	x.s1 = s1 ^ s1 >> top
+	x.s1 = s1 ^ s1>>top
 
-	s2 := x.s2 ^ b + down
+	s2 := x.s2 + b + down
 	s2 = (s2 ^ s2>>up) * strange
 	s2 = (s2 ^ s2>>charm) * bottom
-	x.s2 = s2 ^ s2 >> top
+	x.s2 = s2 ^ s2>>top
 
-	s3 := x.s3 ^ b + down + down
+	s3 := x.s3 + b + down + down
 	s3 = (s3 ^ s3>>up) * strange
 	s3 = (s3 ^ s3>>charm) * bottom
-	x.s3 = s3 ^ s3 >> top
+	x.s3 = s3 ^ s3>>top
 }
 
 // Method next updates the internal state of and returns the next value in the deterministic
@@ -52,38 +52,41 @@ func (x *xoshiro) next() uint64 {
 	s0, s1, s2, s3 := x.s0, x.s1, x.s2, x.s3
 	x.s0 ^= s3 ^ s1
 	x.s1 ^= s2 ^ s0
-	x.s2 ^= s0 ^ s1 << 17
+	x.s2 ^= s0 ^ s1<<17
 	x.s3 = bits.RotateLeft64(s3^s1, 45)
 	return bits.RotateLeft64(s1*5, 7) * 9
 }
 
-func Sum(msg, mac []byte, ln int) []byte {
+func KeyedSum(msg, mac []byte, ln int) []byte {
 	var sum1, sum2 []byte
-	if mac != nil {
-		/* MACs called to the function must be at least the size of the output. */
-		if len(mac) < ln>>3 {
-			panic("invalid input: MAC length too short")
-		} else {
-			var wg sync.WaitGroup
-			wg.Add(2)
-			go func() {
-				sum1 = halfsum(msg, ln)
-				wg.Done()
-			}()
-			go func() {
-				sum2 = halfsum(mac, ln)
-				wg.Done()
-			}()
-			wg.Wait()
-		}
+	/* MACs called to the function must be at least the size of the output. */
+	if len(mac) < ln>>3 {
+		panic("invalid input: MAC length too short")
 	} else {
-		sum1 = halfsum(msg, ln)
-		sum2 = halfsum(sum1, ln)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			sum1 = halfsum(msg, ln)
+			wg.Done()
+		}()
+		go func() {
+			sum2 = halfsum(mac, ln)
+			wg.Done()
+		}()
+		wg.Wait()
 	}
 	for i := ln>>3 - 1; i >= 0; i-- {
 		sum1[i] ^= sum2[i]
 	}
+	return sum1
+}
 
+func Sum(msg []byte, ln int) []byte {
+	sum1 := halfsum(msg, ln)
+	sum2 := halfsum(sum1, ln)
+	for i := ln>>3 - 1; i >= 0; i-- {
+		sum1[i] ^= sum2[i]
+	}
 	return sum1
 }
 
@@ -147,47 +150,47 @@ func halfsum(msg []byte, ln int) []byte {
 			if i == ln>>6-1 {
 				switch rem {
 				case 7:
-					prng.seed(sum, bits.ReverseBytes64(
-						uint64(msg[bSize*(i+1)-7])<<56)^phiE19)
+					prng.seed(
+						sum, uint64(msg[bSize*(i+1)-7]))
 				case 6:
-					prng.seed(sum, bits.ReverseBytes64(
-						uint64(msg[bSize*(i+1)-7])<<56|
-							uint64(msg[bSize*(i+1)-6])<<48)^phiE19)
+					prng.seed(
+						sum, uint64(msg[bSize*(i+1)-7])|
+							uint64(msg[bSize*(i+1)-6])<<8)
 				case 5:
-					prng.seed(sum, bits.ReverseBytes64(
-						uint64(msg[bSize*(i+1)-7])<<56|
-							uint64(msg[bSize*(i+1)-6])<<48|
-							uint64(msg[bSize*(i+1)-5])<<40)^phiE19)
+					prng.seed(
+						sum, uint64(msg[bSize*(i+1)-7])|
+							uint64(msg[bSize*(i+1)-6])<<8|
+							uint64(msg[bSize*(i+1)-5])<<16)
 				case 4:
-					prng.seed(sum, bits.ReverseBytes64(
-						uint64(msg[bSize*(i+1)-7])<<56|
-							uint64(msg[bSize*(i+1)-6])<<48|
-							uint64(msg[bSize*(i+1)-5])<<40|
-							uint64(msg[bSize*(i+1)-4])<<32)^phiE19)
+					prng.seed(
+						sum, uint64(msg[bSize*(i+1)-7])|
+							uint64(msg[bSize*(i+1)-6])<<8|
+							uint64(msg[bSize*(i+1)-5])<<16|
+							uint64(msg[bSize*(i+1)-4])<<24)
 				case 3:
-					prng.seed(sum, bits.ReverseBytes64(
-						uint64(msg[bSize*(i+1)-7])<<56|
-							uint64(msg[bSize*(i+1)-6])<<48|
-							uint64(msg[bSize*(i+1)-5])<<40|
-							uint64(msg[bSize*(i+1)-4])<<32|
-							uint64(msg[bSize*(i+1)-3])<<24)^phiE19)
+					prng.seed(
+						sum, uint64(msg[bSize*(i+1)-7])|
+							uint64(msg[bSize*(i+1)-6])<<8|
+							uint64(msg[bSize*(i+1)-5])<<16|
+							uint64(msg[bSize*(i+1)-4])<<24|
+							uint64(msg[bSize*(i+1)-3])<<32)
 				case 2:
-					prng.seed(sum, bits.ReverseBytes64(
-						uint64(msg[bSize*(i+1)-7])<<56|
-							uint64(msg[bSize*(i+1)-6])<<48|
-							uint64(msg[bSize*(i+1)-5])<<40|
-							uint64(msg[bSize*(i+1)-4])<<32|
-							uint64(msg[bSize*(i+1)-3])<<24|
-							uint64(msg[bSize*(i+1)-2])<<16)^phiE19)
+					prng.seed(
+						sum, uint64(msg[bSize*(i+1)-7])|
+							uint64(msg[bSize*(i+1)-6])<<8|
+							uint64(msg[bSize*(i+1)-5])<<16|
+							uint64(msg[bSize*(i+1)-4])<<24|
+							uint64(msg[bSize*(i+1)-3])<<32|
+							uint64(msg[bSize*(i+1)-2])<<40)
 				case 1:
-					prng.seed(sum, bits.ReverseBytes64(
-						uint64(msg[bSize*(i+1)-7])<<56|
-							uint64(msg[bSize*(i+1)-6])<<48|
-							uint64(msg[bSize*(i+1)-5])<<40|
-							uint64(msg[bSize*(i+1)-4])<<32|
-							uint64(msg[bSize*(i+1)-3])<<24|
-							uint64(msg[bSize*(i+1)-2])<<16|
-							uint64(msg[bSize*(i+1)-1])<<8)^phiE19)
+					prng.seed(
+						sum, uint64(msg[bSize*(i+1)-7])|
+							uint64(msg[bSize*(i+1)-6])<<8|
+							uint64(msg[bSize*(i+1)-5])<<16|
+							uint64(msg[bSize*(i+1)-4])<<24|
+							uint64(msg[bSize*(i+1)-3])<<32|
+							uint64(msg[bSize*(i+1)-2])<<40|
+							uint64(msg[bSize*(i+1)-1])<<48)
 				default:
 					/* Little-endian byte order */
 					prng.seed(sum, *(*uint64)(unsafe.Pointer(&msg[bSize*(i+1)-7])))

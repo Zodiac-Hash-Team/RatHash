@@ -41,9 +41,9 @@ func ratTest() {
 	const testLength = 256
 	for i := ints; i > 0; i-- {
 		binary.BigEndian.PutUint32(iBytes, i)
-		integers[i] = big.NewInt(0).SetBytes(rathash.Sum(iBytes, nil, testLength))
+		integers[i] = big.NewInt(0).SetBytes(rathash.Sum(iBytes, testLength))
 		makeBytes(1024)
-		random[i] = big.NewInt(0).SetBytes(rathash.Sum(rBytes, nil, testLength))
+		random[i] = big.NewInt(0).SetBytes(rathash.Sum(rBytes, testLength))
 	}
 	fmt.Printf("Integer input Monobit test:  %5.3f%%\n", printMeanBias(integers, testLength))
 	fmt.Printf("Random input Monobit test:   %5.3f%%\n", printMeanBias(random, testLength))

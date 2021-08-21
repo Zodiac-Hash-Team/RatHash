@@ -7,21 +7,20 @@ import (
 )
 
 // Copyright © 2021 Matthew R Bonnette. Openly-licensed under a BSD-3-Clause license.
-/* Appends an array of primes to rathash/etc.go. */
+// Appends an array of primes to caches.go.
 
 func main() {
-	str, dex := "", 0
-	primes := make([]uint64, 10000)
-	one := big.NewInt(1)
+	const primeCount = 20000
+	primes := make([]uint64, primeCount)
+	primes[0] = 2
 
-	for i := big.NewInt(2); dex < 10000; i.Add(i, one) {
-		if i.ProbablyPrime(1) {
-			primes[dex] = i.Uint64()
-			dex++
+	for i, prime, two := 1, big.NewInt(1), big.NewInt(2); i < primeCount; i++ {
+		for prime.Add(prime, two).ProbablyPrime(1) == false {
 		}
+		primes[i] = prime.Uint64()
 	}
 
-	str = fmt.Sprintln("\nvar primes = [10000]uint64{")
+	str := fmt.Sprintf("\nvar primes = [%d]uint64{\n", primeCount)
 	for i := range primes {
 		switch i++; {
 		case i%12 == 0:
@@ -34,9 +33,9 @@ func main() {
 	}
 	str += fmt.Sprintln("\n}")
 
-	file, err := os.OpenFile("etc.go", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	file, err := os.OpenFile("caches.go", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		fmt.Println("Failed: etc.go not found and could not be created.")
+		fmt.Println("Failed: caches.go not found and could not be created.")
 		os.Exit(1)
 	}
 	count, err := file.Write([]byte(str))
@@ -44,5 +43,5 @@ func main() {
 		fmt.Println("Failed: could not append array to file.")
 		os.Exit(1)
 	}
-	fmt.Println(count, "bytes appended successfully to etc.go")
+	fmt.Println(count, "bytes appended successfully to caches.go")
 }
