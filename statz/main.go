@@ -14,11 +14,6 @@ import (
 )
 
 // Copyright © 2021 Matthew R Bonnette. Licensed under a BSD-3-Clause license.
-// This program is the hardly-rigorous testing suite for the Go implementation of the RatHash
-// function in direct comparison to other, properly-vetted cryptographic hashing algorithms. It aims
-// to test the following characteristics: deterministicness, extremely short-term collision-
-// resistance, and mean bias per output bit. Furthermore, it benchmarks the relative throughput and
-// memory usage of each algorithm.
 
 const ints = uint32(5e4)
 
