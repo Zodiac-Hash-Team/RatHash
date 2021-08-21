@@ -2,7 +2,6 @@ package rathash
 
 import (
 	"math/big"
-	"math/bits"
 	"sync"
 	"unsafe"
 )
@@ -64,8 +63,8 @@ func (x *xoshiro256starstar) next() uint64 {
 	x.s0 ^= s3 ^ s1
 	x.s1 ^= s2 ^ s0
 	x.s2 ^= s0 ^ s1<<17
-	x.s3 = bits.RotateLeft64(s3^s1, 45)
-	return bits.RotateLeft64(s1*5, 7) * 9
+	x.s3 = (s3^s1)<<45 | (s3^s1)>>19
+	return (s1*5<<7 | s1*5>>57) * 9
 }
 
 func Sum(msg []byte, ln int) []byte {
@@ -179,12 +178,12 @@ func halfsum(msg []byte, ln int) []byte {
 				bRem = 0
 			}
 			prng.seedUpper(sum)
-			sum += prng.next() ^ prng.next() ^ prng.next() ^ (bits.RotateLeft64(prng.s1*5, 7) * 9)
+			sum += prng.next() ^ prng.next() ^ prng.next() ^ ((prng.s1*5<<7 | prng.s1*5>>57) * 9)
 
 			for i2 := bSize>>3 + bRem - 2; i2 >= 0; i2-- {
 				prng.seedLower(*(*uint64)(unsafe.Pointer(&msg[i*bSize+i2<<3])))
 				prng.seedUpper(sum)
-				sum += prng.next() ^ prng.next() ^ prng.next() ^ (bits.RotateLeft64(prng.s1*5, 7) * 9)
+				sum += prng.next() ^ prng.next() ^ prng.next() ^ ((prng.s1*5<<7 | prng.s1*5>>57) * 9)
 			}
 			sums[i] = sum
 			wg.Done()
