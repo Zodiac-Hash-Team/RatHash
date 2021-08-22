@@ -21,7 +21,7 @@ var (
 	size   int64
 	length = runtime.NumCPU() * 64
 	sizes  = []int64{
-		8,
+		64,
 		512 * 1000,
 		64 * 1000 * 1000,
 		1 * 1000 * 1000 * 1000,
@@ -65,15 +65,15 @@ func makeBytes(size int64) {
 func algBench(alg int) {
 	switch alg {
 	case 0:
-		fmt.Printf("RatHash-%-4g 8B    512K     64M      1G\n", float64(length))
+		fmt.Printf("RatHash-%-4g 64B    512K     64M      1G\n", float64(length))
 	case 1:
 		if runtime.GOARCH == "arm64" {
-			fmt.Println("SHA-256      8B    512K     64M      1G")
+			fmt.Println("SHA-256      64B    512K     64M      1G")
 		} else {
-			fmt.Println("SHA-512      8B    512K     64M      1G")
+			fmt.Println("SHA-512      64B    512K     64M      1G")
 		}
 	case 2:
-		fmt.Println("BLAKE3-512   8B    512K     64M      1G")
+		fmt.Println("BLAKE3-512   64B    512K     64M      1G")
 	}
 	throughputs, speeds, usages := make([]float64, 4), make([]float64, 4), make([]float64, 4)
 	for i := range sizes {
@@ -98,13 +98,13 @@ func algBench(alg int) {
 		usages[i] = float64(r.AllocedBytesPerOp())
 	}
 
-	fmt.Printf("Speed    %7.5g %7.5g %7.5g %7.5g  MB/s\n",
+	fmt.Printf("Speed     %7.5g %7.5g %7.5g %7.5g  MB/s\n",
 		throughputs[0]/1e6, throughputs[1]/1e6, throughputs[2]/1e6, throughputs[3]/1e6) /* MB/s */
 	if speeds[0]+speeds[1]+speeds[2]+speeds[3] > 0 {
-		fmt.Printf("         %7.5g %7.5g %7.5g %7.5g  cpb\n",
+		fmt.Printf("          %7.5g %7.5g %7.5g %7.5g  cpb\n",
 			speeds[0], speeds[1], speeds[2], speeds[3])
 	}
-	fmt.Printf("Usage    %7.5g %7.5g %7.5g %7.5g  B/op\n\n",
+	fmt.Printf("Usage     %7.5g %7.5g %7.5g %7.5g  B/op\n\n",
 		usages[0], usages[1], usages[2], usages[3])
 }
 
@@ -126,7 +126,7 @@ func main() {
 
 	t := time.Now()
 	ratTest()
-	fmt.Println(" ============================================ ")
+	fmt.Println(" ============================================= ")
 	algBench(0)
 	algBench(1)
 	algBench(2)
