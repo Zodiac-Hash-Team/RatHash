@@ -22,10 +22,10 @@ const (
 	strange, bottom = 0xbf58476d1ce4e5b9, 0x94d049bb133111eb
 )
 
-// Method seedUpper overwrites the current internal state of `x` using a variation of Sebastiano
+// Method seed01 overwrites the current internal state of `x` using a variation of Sebastiano
 // Vigna's SplitMix64 PRNG algorithm with seed `a`; its outcome is dependent on the previous state.
 // The original source can be found at https://xoroshiro.di.unimi.it/splitmix64.c.
-func (x *xoshiro256starstar) seedUpper(a uint64) {
+func (x *xoshiro256starstar) seed01(a uint64) {
 	/* Will be inlined */
 	s0 := x.s0 + a + down
 	s0 = (s0 ^ s0>>up) * strange
@@ -38,10 +38,10 @@ func (x *xoshiro256starstar) seedUpper(a uint64) {
 	x.s1 = s1 ^ s1>>top
 }
 
-// Method seedLower overwrites the current internal state of `x` using a variation of Sebastiano
+// Method seed23 overwrites the current internal state of `x` using a variation of Sebastiano
 // Vigna's SplitMix64 PRNG algorithm with seed `b`; its outcome is dependent on the previous state.
 // The original source can be found at https://xoroshiro.di.unimi.it/splitmix64.c.
-func (x *xoshiro256starstar) seedLower(b uint64) {
+func (x *xoshiro256starstar) seed23(b uint64) {
 	/* Will be inlined */
 	s2 := x.s2 + b + down
 	s2 = (s2 ^ s2>>up) * strange
@@ -131,39 +131,40 @@ func halfsum(msg []byte, ln int) []byte {
 	for i := ln>>6 - 1; i >= 0; i-- {
 		wg.Add(1)
 		go func(i int) {
-			sum, prng, bRem := sums[i], new(xoshiro256starstar), mRem/8
+			sum, bRem := sums[i], mRem/8
+			var prng xoshiro256starstar
 
 			if i == ln>>6-1 {
 				switch rem {
 				case 7:
-					prng.seedLower(uint64(msg[bSize*(i+1)-7]))
+					prng.seed23(uint64(msg[bSize*(i+1)-7]))
 				case 6:
-					prng.seedLower(uint64(msg[bSize*(i+1)-7]) |
+					prng.seed23(uint64(msg[bSize*(i+1)-7]) |
 						uint64(msg[bSize*(i+1)-6])<<8)
 				case 5:
-					prng.seedLower(uint64(msg[bSize*(i+1)-7]) |
+					prng.seed23(uint64(msg[bSize*(i+1)-7]) |
 						uint64(msg[bSize*(i+1)-6])<<8 |
 						uint64(msg[bSize*(i+1)-5])<<16)
 				case 4:
-					prng.seedLower(uint64(msg[bSize*(i+1)-7]) |
+					prng.seed23(uint64(msg[bSize*(i+1)-7]) |
 						uint64(msg[bSize*(i+1)-6])<<8 |
 						uint64(msg[bSize*(i+1)-5])<<16 |
 						uint64(msg[bSize*(i+1)-4])<<24)
 				case 3:
-					prng.seedLower(uint64(msg[bSize*(i+1)-7]) |
+					prng.seed23(uint64(msg[bSize*(i+1)-7]) |
 						uint64(msg[bSize*(i+1)-6])<<8 |
 						uint64(msg[bSize*(i+1)-5])<<16 |
 						uint64(msg[bSize*(i+1)-4])<<24 |
 						uint64(msg[bSize*(i+1)-3])<<32)
 				case 2:
-					prng.seedLower(uint64(msg[bSize*(i+1)-7]) |
+					prng.seed23(uint64(msg[bSize*(i+1)-7]) |
 						uint64(msg[bSize*(i+1)-6])<<8 |
 						uint64(msg[bSize*(i+1)-5])<<16 |
 						uint64(msg[bSize*(i+1)-4])<<24 |
 						uint64(msg[bSize*(i+1)-3])<<32 |
 						uint64(msg[bSize*(i+1)-2])<<40)
 				case 1:
-					prng.seedLower(uint64(msg[bSize*(i+1)-7]) |
+					prng.seed23(uint64(msg[bSize*(i+1)-7]) |
 						uint64(msg[bSize*(i+1)-6])<<8 |
 						uint64(msg[bSize*(i+1)-5])<<16 |
 						uint64(msg[bSize*(i+1)-4])<<24 |
@@ -171,18 +172,18 @@ func halfsum(msg []byte, ln int) []byte {
 						uint64(msg[bSize*(i+1)-2])<<40 |
 						uint64(msg[bSize*(i+1)-1])<<48)
 				default:
-					prng.seedLower(*(*uint64)(unsafe.Pointer(&msg[bSize*(i+1)-7])))
+					prng.seed23(*(*uint64)(unsafe.Pointer(&msg[bSize*(i+1)-7])))
 				}
 			} else {
-				prng.seedLower(*(*uint64)(unsafe.Pointer(&msg[bSize*(i+1)-7])))
+				prng.seed23(*(*uint64)(unsafe.Pointer(&msg[bSize*(i+1)-7])))
 				bRem = 0
 			}
-			prng.seedUpper(sum)
+			prng.seed01(sum)
 			sum += prng.next() ^ prng.next() ^ prng.next() ^ ((prng.s1*5<<7 | prng.s1*5>>57) * 9)
 
 			for i2 := bSize>>3 + bRem - 2; i2 >= 0; i2-- {
-				prng.seedLower(*(*uint64)(unsafe.Pointer(&msg[i*bSize+i2<<3])))
-				prng.seedUpper(sum)
+				prng.seed23(*(*uint64)(unsafe.Pointer(&msg[i*bSize+i2<<3])))
+				prng.seed01(sum)
 				sum += prng.next() ^ prng.next() ^ prng.next() ^ ((prng.s1*5<<7 | prng.s1*5>>57) * 9)
 			}
 			sums[i] = sum
