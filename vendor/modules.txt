@@ -1,0 +1,24 @@
+# github.com/dterei/gotsc v0.0.0-20160722215413-e78f872945c6
+## explicit
+github.com/dterei/gotsc
+# github.com/p7r0x7/vainpath v0.3.0
+## explicit
+github.com/p7r0x7/vainpath
+# github.com/spf13/pflag v1.0.5
+## explicit
+github.com/spf13/pflag
+# github.com/zeebo/blake3 v0.2.1
+## explicit
+github.com/zeebo/blake3
+github.com/zeebo/blake3/internal/alg
+github.com/zeebo/blake3/internal/alg/compress
+github.com/zeebo/blake3/internal/alg/compress/compress_pure
+github.com/zeebo/blake3/internal/alg/compress/compress_sse41
+github.com/zeebo/blake3/internal/alg/hash
+github.com/zeebo/blake3/internal/alg/hash/hash_avx2
+github.com/zeebo/blake3/internal/alg/hash/hash_pure
+github.com/zeebo/blake3/internal/consts
+github.com/zeebo/blake3/internal/utils
+# golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
+## explicit
+golang.org/x/sys/cpu

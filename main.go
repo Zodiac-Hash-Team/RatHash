@@ -6,12 +6,13 @@ import (
 	"github.com/p7r0x7/rathash/rathash"
 	"github.com/p7r0x7/vainpath"
 	. "github.com/spf13/pflag"
+	"io/ioutil"
 	"os"
 	"runtime"
 	"time"
 )
 
-// Copyright © 2021 Matthew R Bonnette. Licensed under a BSD-3-Clause license.
+// Copyright © 2022 Matthew R Bonnette. Licensed under the Apache-2.0 license.
 // The code in this file is what allows this hash function to be used as a program: It handles
 // command-line flags and arguments, processing files as required by the command-line operator. It
 // also enables the printing of a help menu.
@@ -37,6 +38,7 @@ func main() {
 	if runtime.GOOS == "windows" || noFormat || quiet {
 		yell, purp, und, zero = "", "", "", ""
 	}
+
 	pHelp := BoolP("help", "h", false, purp+"prints this help menu"+zero+"\n")
 
 	pBase64 := BoolP("base64", "b", false, purp+"renders digest as base64 string"+zero+" (default hex string)")
@@ -47,7 +49,7 @@ func main() {
 
 	Bool("quiet", false, purp+"prints ONLY digests or breaking errors"+zero+"\n(disables formatting)")
 
-	pString := BoolP("string", "s", false, purp+"process arguments instead as strings to be hashed"+zero)
+	pString := BoolP("string", "s", false, purp+"process arguments instead as UTF-8 strings to be hashed"+zero)
 
 	pTime := BoolP("time", "t", false, purp+"prints time taken to process each message"+zero)
 	/* Ordered alphabetically except for help, which is hoisted to the top. */
@@ -56,7 +58,7 @@ func main() {
 
 	/* Prints the help menu and exits the program if no other arguments are given. */
 	if *pHelp || NArg() == 0 {
-		Println(yell + "The hopefully, eventually, cryptographic hashing algorithm." + zero + "\n\n" +
+		Println(yell + "The hopefully—eventually—cryptographic hashing algorithm." + zero + "\n\n" +
 			"Usage:\n" +
 			"  rathash [-h] [--quiet|no-formatting]\n" +
 			"          [-b] [--quiet|no-formatting] [-l <int>|l=<int>] -|FILE...\n" +
@@ -65,29 +67,27 @@ func main() {
 			"          [-b] [-t] [--no-formatting] [-l <int>|l=<int>] -s STRING...\n\n" +
 			"Options:")
 		PrintDefaults()
-		Println("\nThanks to spf13's pflag, placement of arguments after `rathash` does not matter\n" +
-			"unless `--` is specified to signal the end of parsed flag groups. Long-form flag\n" +
-			"equivalents above. `-` is treated as a reference to STDIN.")
+		Println("\nOrder of arguments placed after `rathash` does not matter unless `--` is\n" +
+			"specified, signaling the end of parsed flag groups. Long-form flag equivalents\n" +
+			"are above. `-` is treated as a reference to STDIN.")
 		os.Exit(0)
 	}
 
 	/* Checks that the requested digest length meets the function's requirements */
 	if *pLength < 256 || *pLength%64 != 0 {
 		Println(purp + "Digest length in bits must be at least 256 and evenly divisible by 64." + zero)
-		os.Exit(22)
+		os.Exit(1)
 	}
+
 	for i := range Args() {
 		var message []byte
 		path := Arg(i)
-		switch stdInfo, _ := os.Stdin.Stat(); {
+		switch {
 		/* The order of these cases is very important. */
 		case *pString:
 			message = []byte(path)
-		case path == "-" && stdInfo.Size() > 0:
-			message = make([]byte, stdInfo.Size())
-			_, err = os.Stdin.Read(message)
 		case path == "-":
-			message = []byte{}
+			message, err = ioutil.ReadAll(os.Stdin)
 		default:
 			message, err = os.ReadFile(path)
 		}
@@ -104,16 +104,19 @@ func main() {
 		if *pTime {
 			delta = " (" + time.Since(t).String() + ")"
 		}
+
 		if *pBase64 {
 			str = base64.StdEncoding.EncodeToString(digest)
 		} else {
 			str = Sprintf("%x", digest)
 		}
+
 		if *pString {
 			path = "\"" + path + "\""
-		} else {
+		} else if !noFormat {
 			path = und + vainpath.Clean(path) + zero
 		}
+
 		if quiet {
 			Println(str)
 		} else {

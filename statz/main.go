@@ -13,73 +13,89 @@ import (
 	"time"
 )
 
-// Copyright © 2021 Matthew R Bonnette. Licensed under a BSD-3-Clause license.
-
-const ints = uint32(5e4)
+// Copyright © 2022 Matthew R Bonnette. Licensed under the Apache-2.0 license.
 
 var (
-	size   int64
-	length = runtime.NumCPU() * 64
-	sizes  = []int64{
+	size  int64
+	sizes = []int64{
 		64,
 		512 * 1000,
 		64 * 1000 * 1000,
 		1 * 1000 * 1000 * 1000,
 	}
+	sha2 = "with sha512"
+	cpb  = "w/o cpb"
+
 	fn = []func(b *testing.B){
 		func(b *testing.B) {
-			makeBytes(size)
+			bytes := makeBytes(size)
 			b.SetBytes(size)
 			b.ResetTimer()
 			for i := b.N; i > 0; i-- {
-				rathash.Sum(rBytes, length)
+				rathash.Sum(bytes, 256)
 			}
 		},
 		func(b *testing.B) {
-			makeBytes(size)
+			bytes := makeBytes(size)
 			b.SetBytes(size)
 			b.ResetTimer()
 			for i := b.N; i > 0; i-- {
-				sha512.Sum512(rBytes)
+				sha256.Sum256(bytes)
 			}
 		},
 		func(b *testing.B) {
-			makeBytes(size)
+			bytes := makeBytes(size)
 			b.SetBytes(size)
 			b.ResetTimer()
 			for i := b.N; i > 0; i-- {
-				blake3.Sum512(rBytes)
+				sha512.Sum512(bytes)
+			}
+		},
+		func(b *testing.B) {
+			bytes := makeBytes(size)
+			b.SetBytes(size)
+			b.ResetTimer()
+			for i := b.N; i > 0; i-- {
+				blake3.Sum256(bytes)
 			}
 		},
 	}
 )
 
-func makeBytes(size int64) {
-	rBytes = make([]byte, size)
-	_, err := rand.Read(rBytes)
-	if err != nil {
-		panic("failed to generate random data")
+func init() {
+	rand.Seed(time.Now().UnixNano())
+	if runtime.GOARCH == "arm64" {
+		sha2 = "with sha256"
+	} else if runtime.GOARCH == "amd64" {
+		cpb = "with cpb"
 	}
 }
 
-func algBench(alg int) {
+func makeBytes(size int64) []byte {
+	bytes := make([]byte, size)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		panic("failed to generate random data")
+	}
+	return bytes
+}
+
+func benchAlg(alg int) {
 	switch alg {
 	case 0:
-		fmt.Printf("RatHash-%-4g 64B    512K     64M      1G\n", float64(length))
+		fmt.Println("github.com/p7r0x7/rathash/rathash")
 	case 1:
-		if runtime.GOARCH == "arm64" {
-			fmt.Println("SHA-256      64B    512K     64M      1G")
-		} else {
-			fmt.Println("SHA-512      64B    512K     64M      1G")
-		}
+		fmt.Println("crypto/sha256")
 	case 2:
-		fmt.Println("BLAKE3-512   64B    512K     64M      1G")
+		fmt.Println("crypto/sha512")
+	case 3:
+		fmt.Println("github.com/zeebo/blake3")
 	}
 	throughputs, speeds, usages := make([]float64, 4), make([]float64, 4), make([]float64, 4)
 	for i := range sizes {
 		size = sizes[i]
 		var totalHz, polls uint64
-		if runtime.GOARCH == "amd64" {
+		if cpb == "with cpb" {
 			go func() {
 				calltime := gotsc.TSCOverhead()
 				for throughputs[i] == 0 {
@@ -109,27 +125,19 @@ func algBench(alg int) {
 }
 
 func main() {
-	if length < 256 {
-		length = 256
-	}
-	if runtime.GOARCH == "arm64" {
-		fn[1] = func(b *testing.B) {
-			makeBytes(size)
-			b.SetBytes(size)
-			b.ResetTimer()
-			for i := b.N; i > 0; i-- {
-				sha256.Sum256(rBytes)
-			}
-		}
-	}
-	fmt.Printf("Running Statz on %d CPUs!\n\n", runtime.NumCPU())
-
 	t := time.Now()
-	ratTest()
-	fmt.Println(" ============================================= ")
-	algBench(0)
-	algBench(1)
-	algBench(2)
+	fmt.Printf("Running Statz on %d CPUs!\n%s/%s: %s, %s\n\n",
+		runtime.NumCPU(), runtime.GOOS, runtime.GOARCH, sha2, cpb)
 
-	fmt.Printf("Finished in %s on %s/%s.\n", time.Since(t).String(), runtime.GOOS, runtime.GOARCH)
+	fmt.Printf("             64B    512K     64M      1G\n\n")
+
+	benchAlg(0)
+	if sha2 == "with sha256" {
+		benchAlg(1)
+	} else {
+		benchAlg(2)
+	}
+	benchAlg(3)
+
+	fmt.Printf("Finished in %s.\n", time.Since(t).String())
 }
