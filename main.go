@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/base64"
 	. "fmt"
-	"github.com/p7r0x7/rathash/rathash"
+	"github.com/p7r0x7/rathash/api"
 	"github.com/p7r0x7/vainpath"
 	. "github.com/spf13/pflag"
 	"io/ioutil"
@@ -98,7 +98,7 @@ func main() {
 		}
 
 		t := time.Now()
-		digest := rathash.Sum(message, *pLength)
+		digest := api.Sum(message, *pLength)
 		var str, delta string
 
 		if *pTime {

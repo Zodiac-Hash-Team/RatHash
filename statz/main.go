@@ -5,7 +5,7 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"github.com/dterei/gotsc"
-	"github.com/p7r0x7/rathash/rathash"
+	"github.com/p7r0x7/rathash/api"
 	"github.com/zeebo/blake3"
 	"math/rand"
 	"runtime"
@@ -32,7 +32,7 @@ var (
 			b.SetBytes(size)
 			b.ResetTimer()
 			for i := b.N; i > 0; i-- {
-				rathash.Sum(bytes, 256)
+				api.Sum(bytes, 256)
 			}
 		},
 		func(b *testing.B) {
@@ -83,7 +83,7 @@ func makeBytes(size int64) []byte {
 func benchAlg(alg int) {
 	switch alg {
 	case 0:
-		fmt.Println("github.com/p7r0x7/rathash/rathash")
+		fmt.Println("github.com/p7r0x7/rathash/api")
 	case 1:
 		fmt.Println("crypto/sha256")
 	case 2:
