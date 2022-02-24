@@ -29,10 +29,13 @@ var (
 	fn = []func(b *testing.B){
 		func(b *testing.B) {
 			bytes := makeBytes(size)
+			d := api.New(32)
 			b.SetBytes(size)
 			b.ResetTimer()
 			for i := b.N; i > 0; i-- {
-				api.Sum(bytes, 256)
+				d.Write(bytes)
+				d.Sum(nil)
+				d.Reset()
 			}
 		},
 		func(b *testing.B) {
@@ -64,9 +67,12 @@ var (
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
-	if runtime.GOARCH == "arm64" {
+	switch runtime.GOARCH {
+	case "arm64":
+		fallthrough
+	case "386":
 		sha2 = "with sha256"
-	} else if runtime.GOARCH == "amd64" {
+	case "amd64":
 		cpb = "with cpb"
 	}
 }
@@ -125,12 +131,11 @@ func benchAlg(alg int) {
 }
 
 func main() {
-	t := time.Now()
-	fmt.Printf("Running Statz on %d CPUs!\n%s/%s: %s, %s\n\n",
+	fmt.Printf("Running Statz on %d CPUs!\n%s/%s: %s, %s\n\n"+
+		"             64B    512K     64M      1G\n\n",
 		runtime.NumCPU(), runtime.GOOS, runtime.GOARCH, sha2, cpb)
 
-	fmt.Printf("             64B    512K     64M      1G\n\n")
-
+	t := time.Now()
 	benchAlg(0)
 	if sha2 == "with sha256" {
 		benchAlg(1)
