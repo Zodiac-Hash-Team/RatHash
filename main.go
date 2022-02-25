@@ -80,6 +80,10 @@ func main() {
 		os.Exit(0)
 	}
 
+	if pRaw {
+		pStrict = true
+	}
+
 	if pKeyed {
 		key = make([]byte, api.KeySize())
 		if _, err := io.ReadAtLeast(os.Stdin, key, api.KeySize()); err != nil {
@@ -98,8 +102,8 @@ func main() {
 				warn(err)
 				continue
 			}
-		} else if buf := make([]byte, digest.BlockSize()); path == "-" {
-			if _, err := io.CopyBuffer(digest, os.Stdin, buf); err != nil {
+		} else if path == "-" {
+			if _, err := io.Copy(digest, os.Stdin); err != nil {
 				warn(err)
 				continue
 			}
@@ -108,7 +112,7 @@ func main() {
 				warn(err)
 				continue
 			} else {
-				_, err = io.CopyBuffer(digest, file, buf)
+				_, err = io.Copy(digest, file)
 				_ = file.Close() /* Error irrelevant */
 				if err != nil {
 					warn(err)
@@ -163,9 +167,8 @@ func main() {
 }
 
 func warn(err error) {
-	if pStrict || pRaw {
+	if pStrict {
 		panic(err)
-	} else {
-		errors++
 	}
+	errors++
 }

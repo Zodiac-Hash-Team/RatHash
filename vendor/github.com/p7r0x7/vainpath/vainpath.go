@@ -9,10 +9,9 @@ import (
 // Copyright © 2022 Matthew R Bonnette. Licensed under a BSD-3-Clause license.
 
 // Clean formats inputs in a way similar to the fish shell's method of shortening paths in
-// `fish/functions/prompt_pwd.fish`; it will almost certainly not return valid paths and should be
-// used for vanity purposes only.
+// 'fish/functions/prompt_pwd.fish' and is Windows-sensitive; it will almost certainly not return
+// valid paths and should be used for vanity purposes only.
 func Clean(path string) string {
-	/* Windows-sensitive */
 	segments := strings.Split(filepath.Clean(path), string(filepath.Separator))
 
 	/* Skips final index */
@@ -28,5 +27,5 @@ func Clean(path string) string {
 		}
 	}
 
-	return strings.Join(segments, string(filepath.Separator)) /* Windows-sensitive */
+	return strings.Join(segments, string(filepath.Separator))
 }

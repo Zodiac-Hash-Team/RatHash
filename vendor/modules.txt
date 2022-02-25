@@ -4,7 +4,7 @@ github.com/aead/chacha20/chacha
 # github.com/dterei/gotsc v0.0.0-20160722215413-e78f872945c6
 ## explicit
 github.com/dterei/gotsc
-# github.com/p7r0x7/vainpath v0.3.0
+# github.com/p7r0x7/vainpath v0.3.1
 ## explicit; go 1.11
 github.com/p7r0x7/vainpath
 # github.com/spf13/pflag v1.0.5
