@@ -17,22 +17,20 @@ const (
 	rounds        = 4
 	bytesPerBlock = 32 * 1024
 	wordsPerBlock = bytesPerBlock / 8
-	jsfConst      = uint32(0xf1ea5eed)
 	pcgHi, pcgLo  = 2549297995355413924, 4865540595714422341
+	jsfIV, pcgIV  = uint32(0xf1ea5eed), uint64(0xcafef00dd15ea5e5)
 	small, big    = 0x9e3779b97f4a7c15, (small * wordsPerBlock) % (1 << 64)
 )
 
 func (d *digest) consume(b block) {
-	/* This creates a uint64 slice pointing to the bytes of the block. */
-	/* TODO: Potentially reduce this/remove the dependency on Go 1.17+ altogether. */
-	words := unsafe.Slice((*uint64)(unsafe.Pointer(
-		(*reflect.SliceHeader)(unsafe.Pointer(&b.bytes)).Data)), wordsPerBlock)
-	sums, pHi, pLo := [8]uint64{}, uint64(0), uint64(0)
+	/* reflect.SliceHeader is necessary because the slice may contain no elements. */
+	sums, pHi, pLo, words := [8]uint64{}, uint64(0), pcgIV, (*[wordsPerBlock]uint64)(
+		unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&b.bytes)).Data))
 
 	/* jsf32 initialization based on the recommendations of the author.
 	Source available at https://burtleburtle.net/bob/rand/smallprng.html. */
 	jD := crc32.Checksum(b.bytes, crc32.MakeTable(crc32.IEEE))
-	jA, jB, jC := jsfConst, jD, jD
+	jA, jB, jC := jsfIV, jD, jD
 	for i := 19; i > 0; i-- {
 		jE := jA - RotateLeft32(jB, 27)
 		jA = jB ^ RotateLeft32(jC, 17)
@@ -61,8 +59,8 @@ func (d *digest) consume(b block) {
 			words[next] = t
 
 			pLo += words[i2] /* Update lower state. */
-			/* pcgmcg128xslrr64 requires 128-bit multiplication; here it is emulated using
-			64-bit values. */
+			/* pcgmcg128xslrr64 requires 128-bit multiplication; here it is emulated using 64-bit
+			values. See https://github.com/imneme/pcg-c/blob/master/include/pcg_variants.h. */
 			hi, lo := Mul64(pLo, pcgLo)
 			hi += pcgHi*pLo + pcgLo*pHi
 			pHi, pLo = hi, lo
@@ -74,8 +72,8 @@ func (d *digest) consume(b block) {
 	}
 
 	// Return Checksum
-	folded, unfolded := [32]byte{}, unsafe.Slice((*byte)(unsafe.Pointer(&sums[0])), 64)
-	for i := range folded {
+	folded, unfolded := [32]byte{}, (*[64]byte)(unsafe.Pointer(&sums[0]))
+	for i := 0; i < 32; i++ {
 		folded[i] = unfolded[i] ^ unfolded[i+32]
 	}
 	d.state.Store(b.dex, folded)

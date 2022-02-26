@@ -72,6 +72,7 @@ func (d *digest) Sum(key []byte) []byte {
 	} else if len(key) != 24 {
 		panic(fmt.Errorf("rathash: key size of %d invalid, must be 24", len(key)))
 	}
+
 	if len(d.lag) > 0 {
 		b := block{d.dex, make([]byte, len(d.lag), bytesPerBlock)}
 		copy(b.bytes, d.lag)
@@ -104,8 +105,8 @@ func (d *digest) Reset() {
 
 func (d *digest) initWorkers() {
 	d.ch = make(chan block)
+	d.wg.Add(runtime.NumCPU() * 2)
 	for i := runtime.NumCPU() * 2; i > 0; i-- {
-		d.wg.Add(1)
 		go func() {
 			for {
 				b, ok := <-d.ch
