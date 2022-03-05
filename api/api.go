@@ -17,6 +17,8 @@ type digest struct {
 	wg      sync.WaitGroup
 	state   sync.Map /* TODO: Test whether or not a map + mutex would be faster. */
 	lag     []byte
+
+	buf [bytesPerBlock]byte
 }
 
 type block struct {
@@ -40,15 +42,15 @@ func New(ln uint) hash.Hash {
 	return &d
 }
 
-func (d *digest) Write(buf []byte) (int, error) {
-	total := len(buf)
+func (d *digest) Write(buf []byte) (count int, err error) {
+	count = len(buf)
 	if len(d.lag) > 0 {
 		buf = append(d.lag, buf...)
 		d.lag = d.lag[:0]
 	}
 
-	left := total
-	for ; left >= bytesPerBlock; left -= bytesPerBlock {
+	rem := len(buf)
+	for ; rem >= bytesPerBlock; rem -= bytesPerBlock {
 		b := block{d.dex, make([]byte, bytesPerBlock)}
 		copy(b.bytes, buf[:bytesPerBlock])
 		d.ch <- b
@@ -56,11 +58,12 @@ func (d *digest) Write(buf []byte) (int, error) {
 		buf = buf[bytesPerBlock:]
 		d.dex++
 	}
-	if left > 0 {
-		d.lag = append(d.lag, buf...)
+	if rem > 0 {
+		d.lag = d.buf[:rem]
+		copy(d.lag, buf)
 	}
 
-	return total, nil
+	return
 }
 
 /* TODO: Align Sum() method to its expected usage in hash.Hash. */
