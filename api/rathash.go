@@ -29,9 +29,9 @@ func (d *digest) consume(b block) {
 
 	/* jsf32 initialization based on the recommendations of the author.
 	Source available at https://burtleburtle.net/bob/rand/smallprng.html. */
-	jD := crc32.Checksum(b.bytes, crc32.MakeTable(crc32.IEEE))
+	jD := crc32.ChecksumIEEE(b.bytes)
 	jA, jB, jC := jsfIV, jD, jD
-	for i := 19; i > 0; i-- {
+	for i := 0; i < 19; i++ {
 		jE := jA - RotateLeft32(jB, 27)
 		jA = jB ^ RotateLeft32(jC, 17)
 		jB = jC + jD
@@ -76,7 +76,9 @@ func (d *digest) consume(b block) {
 	for i := 0; i < 32; i++ {
 		folded[i] = unfolded[i] ^ unfolded[i+32]
 	}
-	d.state.Store(b.dex, folded)
+	d.mapping.Lock()
+	d.tree[b.dex] = folded[:]
+	d.mapping.Unlock()
 }
 
 /* TODO: Implement a SumReader() function that is called by Sum() that enables streaming for large digests. */

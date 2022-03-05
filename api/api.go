@@ -14,17 +14,19 @@ import (
 type digest struct {
 	ln, dex uint
 	ch      chan block
-	wg      sync.WaitGroup
-	state   sync.Map /* TODO: Test whether or not a map + mutex would be faster. */
+	buf     [bytesPerBlock]byte
+	tree    map[uint][]byte
+	summing sync.WaitGroup
+	mapping sync.Mutex
 	lag     []byte
-
-	buf [bytesPerBlock]byte
 }
 
 type block struct {
 	dex   uint
 	bytes []byte
 }
+
+var threads = runtime.NumCPU()
 
 func KeySize() int { return 24 }
 
@@ -33,13 +35,9 @@ func (d *digest) Size() int { return int(d.ln) }
 func (d *digest) BlockSize() int { return bytesPerBlock }
 
 func New(ln uint) hash.Hash {
-	d := digest{
-		ln:    ln,
-		state: sync.Map{},
-		lag:   make([]byte, 0, bytesPerBlock-1)}
-
+	d := &digest{ln: ln, tree: map[uint][]byte{}}
 	d.initWorkers()
-	return &d
+	return d
 }
 
 func (d *digest) Write(buf []byte) (count int, err error) {
@@ -73,48 +71,53 @@ func (d *digest) Sum(key []byte) []byte {
 		/* If key is nil or []byte(nil) or []byte{}, unkeyed hashing is assumed. */
 		key = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	} else if len(key) != 24 {
-		panic(fmt.Errorf("rathash: key size of %d invalid, must be 24", len(key)))
+		panic(fmt.Errorf("rathash: Sum: key size of %d invalid, must be 24", len(key)))
 	}
 
 	if len(d.lag) > 0 {
 		b := block{d.dex, make([]byte, len(d.lag), bytesPerBlock)}
 		copy(b.bytes, d.lag)
 		d.consume(b)
+		d.dex++
 	} else if d.dex == 0 {
 		/* This can happen if 0 bytes were written to d. */
 		b := block{0, make([]byte, 0, bytesPerBlock)}
 		d.consume(b)
-	} else {
-		d.dex--
+		d.dex++
 	}
-	d.wg.Wait()
+	d.summing.Wait()
 
 	/* TODO: Implement Merkle Tree hashing. */
-	tmp, _ := d.state.LoadAndDelete(d.dex) /* State alterations are undone. */
-	sum := tmp.([32]byte)
-
 	final := make([]byte, d.ln)
-	chacha.XORKeyStream(final, final, key, sum[:], 8)
+	chacha.XORKeyStream(final, final, key, d.tree[d.dex-1], 8)
+
+	/* State alterations, if any, are undone. */
+	if len(d.lag) > 0 || d.dex == 0 {
+		d.dex--
+		delete(d.tree, d.dex)
+	}
 	d.initWorkers() /* Parallel hashing threads are re-established. */
+
 	return final
 }
 
 func (d *digest) Reset() {
 	/* TODO: Ensure that secret information is being securely erased. */
-	close(d.ch)
-	d.dex, d.state, d.lag = 0, sync.Map{}, make([]byte, 0, bytesPerBlock-1)
-	d.initWorkers()
+	d.dex, d.buf, d.lag = 0, [bytesPerBlock]byte{}, nil
+	for k := range d.tree {
+		delete(d.tree, k)
+	}
 }
 
 func (d *digest) initWorkers() {
-	d.ch = make(chan block)
-	d.wg.Add(runtime.NumCPU() * 2)
-	for i := runtime.NumCPU() * 2; i > 0; i-- {
+	d.ch = make(chan block, threads*2)
+	d.summing.Add(threads)
+	for i := threads; i > 0; i-- {
 		go func() {
 			for {
 				b, ok := <-d.ch
 				if !ok {
-					d.wg.Done()
+					d.summing.Done()
 					return
 				}
 				d.consume(b)
