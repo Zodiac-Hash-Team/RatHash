@@ -92,8 +92,10 @@ func main() {
 		star = "(*)"
 	}
 
+	digest := api.New(pLength)
 	for _, path := range Args() {
-		digest, start, delta := api.New(pLength), time.Now(), ""
+		digest.Reset()
+		start, delta := time.Now(), ""
 
 		/* The order of these cases is very deliberate. */
 		if pString {
