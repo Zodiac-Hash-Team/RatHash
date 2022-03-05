@@ -14,7 +14,6 @@ import (
 type digest struct {
 	ln, dex uint
 	ch      chan block
-	buf     [bytesPerBlock]byte
 	tree    map[uint][]byte
 	summing sync.WaitGroup
 	mapping sync.Mutex
@@ -35,20 +34,19 @@ func (d *digest) Size() int { return int(d.ln) }
 func (d *digest) BlockSize() int { return bytesPerBlock }
 
 func New(ln uint) hash.Hash {
-	d := &digest{ln: ln, tree: map[uint][]byte{}}
+	d := &digest{ln: ln, tree: map[uint][]byte{}, lag: []byte{}}
 	d.initWorkers()
 	return d
 }
 
-func (d *digest) Write(buf []byte) (count int, err error) {
-	count = len(buf)
+func (d *digest) Write(buf []byte) (int, error) {
+	count := len(buf)
 	if len(d.lag) > 0 {
 		buf = append(d.lag, buf...)
 		d.lag = d.lag[:0]
 	}
 
-	rem := len(buf)
-	for ; rem >= bytesPerBlock; rem -= bytesPerBlock {
+	for len(buf) >= bytesPerBlock {
 		b := block{d.dex, make([]byte, bytesPerBlock)}
 		copy(b.bytes, buf[:bytesPerBlock])
 		d.ch <- b
@@ -56,12 +54,11 @@ func (d *digest) Write(buf []byte) (count int, err error) {
 		buf = buf[bytesPerBlock:]
 		d.dex++
 	}
-	if rem > 0 {
-		d.lag = d.buf[:rem]
-		copy(d.lag, buf)
+	if len(buf) > 0 {
+		d.lag = append(d.lag, buf...)
 	}
 
-	return
+	return count, nil
 }
 
 /* TODO: Align Sum() method to its expected usage in hash.Hash. */
@@ -103,7 +100,7 @@ func (d *digest) Sum(key []byte) []byte {
 
 func (d *digest) Reset() {
 	/* TODO: Ensure that secret information is being securely erased. */
-	d.dex, d.buf, d.lag = 0, [bytesPerBlock]byte{}, nil
+	d.dex, d.lag = 0, []byte{}
 	for k := range d.tree {
 		delete(d.tree, k)
 	}
