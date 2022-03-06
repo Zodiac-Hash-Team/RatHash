@@ -43,23 +43,23 @@ func (d *digest) consume(b block) {
 		weyl := big * uint64(b.dex*(rounds+i))
 
 		for i2 := uint64(0); i2 < wordsPerBlock; i2++ {
-			/* Find next word to process. */
+			/* jsf32 generates a pseudorandom permutation of words.
+			Source available at https://burtleburtle.net/bob/rand/smallprng.html. */
 			jE := jA - RotateLeft32(jB, 27)
 			jA = jB ^ RotateLeft32(jC, 17)
 			jB = jC + jD
 			jC = jD + jE
 			jD = jE + jA
-			/* Note: jD cannot be safely cast to int on 32-bit systems. */
 			next := uint64(jD)%(wordsPerBlock-i2) + i2
 
 			/* Increment by counter and swap indicies. */
 			t := words[i2]
-			words[i2] = small*(next+1) + weyl + words[next]
+			words[i2] = words[next] + weyl + (next+1)*small
 			words[next] = t
 
 			pLo += words[i2] /* Update lower state. */
-			/* pcgmcg128xslrr64 requires 128-bit multiplication; here it is emulated using 64-bit
-			values. See https://github.com/imneme/pcg-c/blob/master/include/pcg_variants.h. */
+			/* pcgmcg128xslrr64 updates sums; the 128-bit multiplication it requires is emulated using
+			64-bit values. See https://github.com/imneme/pcg-c/blob/master/include/pcg_variants.h. */
 			hi, lo := Mul64(pLo, pcgLo)
 			hi += pcgHi*pLo + pcgLo*pHi
 			pHi, pLo = hi, lo
@@ -71,12 +71,9 @@ func (d *digest) consume(b block) {
 	}
 
 	// Return Checksum
-	folded, unfolded := [32]byte{}, (*[64]byte)(unsafe.Pointer(&sums[0]))
-	for i := 0; i < 32; i++ {
-		folded[i] = unfolded[i] ^ unfolded[i+32]
-	}
+	folded := [4]uint64{sums[0] ^ sums[4], sums[1] ^ sums[5], sums[2] ^ sums[6], sums[3] ^ sums[7]}
 	d.mapping.Lock()
-	d.tree[b.dex] = folded[:]
+	d.tree[b.dex] = (*[32]byte)(unsafe.Pointer(&folded[0]))[:]
 	d.mapping.Unlock()
 }
 

@@ -34,7 +34,7 @@ func (d *digest) Size() int { return int(d.ln) }
 func (d *digest) BlockSize() int { return bytesPerBlock }
 
 func New(ln uint) hash.Hash {
-	d := &digest{ln: ln, tree: map[uint][]byte{}, lag: []byte{}}
+	d := &digest{ln: ln, tree: map[uint][]byte{}}
 	d.initWorkers()
 	return d
 }
@@ -96,7 +96,7 @@ func (d *digest) Sum(key []byte) []byte {
 
 func (d *digest) Reset() {
 	/* TODO: Ensure that secret information is being securely erased. */
-	d.dex, d.lag = 0, []byte{}
+	d.dex, d.lag = 0, nil
 	for k := range d.tree {
 		delete(d.tree, k)
 	}
