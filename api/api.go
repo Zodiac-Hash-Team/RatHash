@@ -47,10 +47,7 @@ func (d *digest) Write(buf []byte) (int, error) {
 	}
 
 	for len(buf) >= bytesPerBlock {
-		b := block{d.dex, make([]byte, bytesPerBlock)}
-		copy(b.bytes, buf[:bytesPerBlock])
-		d.ch <- b
-
+		d.ch <- block{d.dex, buf[:bytesPerBlock]}
 		buf = buf[bytesPerBlock:]
 		d.dex++
 	}
@@ -63,6 +60,8 @@ func (d *digest) Write(buf []byte) (int, error) {
 
 /* TODO: Align Sum() method to its expected usage in hash.Hash. */
 func (d *digest) Sum(key []byte) []byte {
+	/* TODO: See if RWMutex + an atomic counter is a better method of syncronization,
+	as we could reuse the goroutines instead of killing them each time Sum() is called. */
 	close(d.ch) /* Parallel hashing operations are terminated. */
 	if len(key) == 0 {
 		/* If key is nil or []byte(nil) or []byte{}, unkeyed hashing is assumed. */
@@ -72,14 +71,11 @@ func (d *digest) Sum(key []byte) []byte {
 	}
 
 	if len(d.lag) > 0 {
-		b := block{d.dex, make([]byte, len(d.lag), bytesPerBlock)}
-		copy(b.bytes, d.lag)
-		d.consume(b)
+		d.consume(block{d.dex, d.lag})
 		d.dex++
 	} else if d.dex == 0 {
 		/* This can happen if 0 bytes were written to d. */
-		b := block{0, make([]byte, 0, bytesPerBlock)}
-		d.consume(b)
+		d.consume(block{0, make([]byte, 0, bytesPerBlock)})
 		d.dex++
 	}
 	d.summing.Wait()

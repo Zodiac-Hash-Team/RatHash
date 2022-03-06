@@ -3,7 +3,6 @@ package api
 import (
 	"hash/crc32"
 	. "math/bits"
-	"reflect"
 	"unsafe"
 )
 
@@ -23,9 +22,9 @@ const (
 )
 
 func (d *digest) consume(b block) {
-	/* reflect.SliceHeader is necessary because the slice may contain no elements. */
-	sums, pHi, pLo, words := [8]uint64{}, uint64(0), pcgIV, (*[wordsPerBlock]uint64)(
-		unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&b.bytes)).Data))
+	sums, pHi, pLo, bytes := [8]uint64{}, uint64(0), pcgIV, make([]byte, bytesPerBlock)
+	words := (*[wordsPerBlock]uint64)(unsafe.Pointer(&bytes[0]))
+	copy(bytes, b.bytes) /* A safely-mutable copy must be made. */
 
 	/* jsf32 initialization based on the recommendations of the author.
 	Source available at https://burtleburtle.net/bob/rand/smallprng.html. */
