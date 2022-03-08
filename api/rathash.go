@@ -21,29 +21,23 @@ const (
 	small, big    = 0x9e3779b97f4a7c15, (small * wordsPerBlock) % (1 << 64)
 )
 
+var castagnoli = crc32.MakeTable(crc32.Castagnoli)
+
 func (d *digest) consume(b block) {
+
+	// Initialization
+	crc := [2]uint32{crc32.ChecksumIEEE(b.bytes), crc32.Checksum(b.bytes, castagnoli)}
 	sums, pHi, pLo, bytes := [8]uint64{}, uint64(0), pcgIV, make([]byte, bytesPerBlock)
 	words := (*[wordsPerBlock]uint64)(unsafe.Pointer(&bytes[0]))
 	copy(bytes, b.bytes) /* A safely-mutable copy must be made. */
 
-	/* jsf32 initialization based on the recommendations of the author.
-	Source available at https://burtleburtle.net/bob/rand/smallprng.html. */
-	jD := crc32.ChecksumIEEE(b.bytes)
-	jA, jB, jC := jsfIV, jD, jD
-	for i := 0; i < 19; i++ {
-		jE := jA - RotateLeft32(jB, 27)
-		jA = jB ^ RotateLeft32(jC, 17)
-		jB = jC + jD
-		jC = jD + jE
-		jD = jE + jA
-	}
-
 	// Rounds
 	for i := uint(0); i < rounds; i++ {
-		weyl := big * uint64(b.dex*(rounds+i))
+		weyl := big * uint64(b.dex*rounds+i)
+		jA, jB, jC, jD := jsfIV, crc[i&1], crc[i&1], crc[i&1]
 
 		for i2 := uint64(0); i2 < wordsPerBlock; i2++ {
-			/* jsf32 generates a pseudorandom permutation of words.
+			/* jsf32 generates a pseudorandom permutation of words using a Fisher-Yates shuffle.
 			Source available at https://burtleburtle.net/bob/rand/smallprng.html. */
 			jE := jA - RotateLeft32(jB, 27)
 			jA = jB ^ RotateLeft32(jC, 17)
