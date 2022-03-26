@@ -11,6 +11,7 @@ import (
 // Copyright © 2022 Matthew R Bonnette. Licensed under the Apache-2.0 license.
 // This file contains a Go-specific API implementing the standard hash.Hash interface.
 
+/* TODO: Export digest for parallelized hashing and make Sum() align with its expected serial, single-threaded usage in hash.Hash. */
 type digest struct {
 	ln, dex uint
 	ch      chan block
@@ -39,6 +40,7 @@ func New(ln uint) hash.Hash {
 	return d
 }
 
+/* TODO: Investigate that 1GiB inputs switch between allocating 4.5 and 6.1 MB, a process that dramatically affects performance. */
 func (d *digest) Write(buf []byte) (int, error) {
 	count := len(buf)
 	if len(d.lag) > 0 {
@@ -58,7 +60,6 @@ func (d *digest) Write(buf []byte) (int, error) {
 	return count, nil
 }
 
-/* TODO: Align Sum() method to its expected usage in hash.Hash. */
 func (d *digest) Sum(key []byte) []byte {
 	/* TODO: See if RWMutex + an atomic counter is a better method of syncronization,
 	as we could reuse the goroutines instead of killing them each time Sum() is called. */
@@ -80,7 +81,7 @@ func (d *digest) Sum(key []byte) []byte {
 	}
 	d.summing.Wait()
 
-	/* TODO: Implement Merkle Tree hashing. */
+	/* TODO: Implement product hashing. */
 	final := make([]byte, d.ln)
 	chacha.XORKeyStream(final, final, key, d.tree[d.dex-1], 8)
 

@@ -19,17 +19,19 @@ const (
 	pcgHi, pcgLo  = 2549297995355413924, 4865540595714422341
 	jsfIV, pcgIV  = uint32(0xf1ea5eed), uint64(0xcafef00dd15ea5e5)
 	small, big    = 0x9e3779b97f4a7c15, (small * wordsPerBlock) % (1 << 64)
+	/* TODO: Add different weyl sequence constants for the internal tree. */
 )
 
 var castagnoli = crc32.MakeTable(crc32.Castagnoli)
 
+/* TODO: Correct that CRC prevents consume() from being a constant-time operation for all inputs. */
 func (d *digest) consume(b block) {
 
 	// Initialization
 	crc := [2]uint32{crc32.ChecksumIEEE(b.bytes), crc32.Checksum(b.bytes, castagnoli)}
 	sums, pHi, pLo, bytes := [8]uint64{}, uint64(0), pcgIV, make([]byte, bytesPerBlock)
 	words := (*[wordsPerBlock]uint64)(unsafe.Pointer(&bytes[0]))
-	copy(bytes, b.bytes) /* A safely-mutable copy must be made. */
+	copy(bytes, b.bytes) /* TODO: Find a way to make this unnecessary. */
 
 	// Rounds
 	for i := uint(0); i < rounds; i++ {
@@ -45,15 +47,12 @@ func (d *digest) consume(b block) {
 			jC = jD + jE
 			jD = jE + jA
 			next := uint64(jD)%(wordsPerBlock-i2) + i2
-
-			/* Increment by counter and swap indicies. */
-			t := words[i2]
-			words[i2] = words[next] + weyl + (next+1)*small
-			words[next] = t
+			words[i2], words[next] = words[next]+weyl+(next+1)*small, words[i2]
 
 			pLo += words[i2] /* Update lower state. */
 			/* pcgmcg128xslrr64 updates sums; the 128-bit multiplication it requires is emulated using
 			64-bit values. See https://github.com/imneme/pcg-c/blob/master/include/pcg_variants.h. */
+			/* TODO: Obviate 64-bit emulation with ASM. */
 			hi, lo := Mul64(pLo, pcgLo)
 			hi += pcgHi*pLo + pcgLo*pHi
 			pHi, pLo = hi, lo
@@ -71,4 +70,4 @@ func (d *digest) consume(b block) {
 	d.mapping.Unlock()
 }
 
-/* TODO: Implement a SumReader() function that is called by Sum() that enables streaming for large digests. */
+/* TODO: Implement a SumReader() function that enables digest streaming. */

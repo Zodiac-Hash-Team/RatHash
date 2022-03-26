@@ -106,7 +106,7 @@ func fmtFloats(f ...float64) string {
 	var str, style string
 	for _, v := range f {
 		switch whole := float64(int64(v)) == v; {
-		case v > 1e8:
+		case v > 1e8 || (v < 1e-6 && !whole):
 			style = "%8.3g"
 		case v <= 1e1 && !whole:
 			style = "%8.6f"
