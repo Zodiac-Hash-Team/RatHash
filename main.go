@@ -80,6 +80,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	if pLength == 0 {
+		Println(purp + "Output length must be at least 1 byte." + zero)
+		os.Exit(1)
+	}
+
 	if pRaw {
 		pStrict = true
 	}
@@ -93,24 +98,25 @@ func main() {
 	}
 
 	digest := api.New(pLength)
-	for _, path := range Args() {
+	for _, target := range Args() {
 		digest.Reset()
 		start, delta := time.Now(), ""
 
 		/* The order of these cases is very deliberate. */
 		if pString {
 			/* hash.Hash cannot implement (*Writer).WriteString. */
-			if _, err := digest.Write([]byte(path)); err != nil {
+			if _, err := digest.Write([]byte(target)); err != nil {
 				warn(err)
 				continue
 			}
-		} else if path == "-" {
+		} else if target == "-" {
 			if _, err := io.Copy(digest, os.Stdin); err != nil {
 				warn(err)
 				continue
 			}
 		} else {
-			if file, err := os.Open(path); err != nil {
+			/* TODO: Use serial mode for small messages. */
+			if file, err := os.Open(target); err != nil {
 				warn(err)
 				continue
 			} else {
@@ -142,15 +148,15 @@ func main() {
 		}
 
 		if pString {
-			path = "\"" + path + "\""
+			target = "\"" + target + "\""
 		} else if !pNoCodes {
-			path = und + vainpath.Clean(path) + zero
+			target = und + vainpath.Clean(target) + zero
 		}
 
 		if pQuiet {
 			Println(sum)
 		} else {
-			Println(star + yell + sum.(string) + zero + "  " + path + delta)
+			Println(star + yell + sum.(string) + zero + "  " + target + delta)
 		}
 	}
 
