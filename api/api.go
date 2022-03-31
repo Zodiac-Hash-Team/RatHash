@@ -76,7 +76,7 @@ func (d *digest) Sum(key []byte) []byte {
 		d.dex++
 	} else if d.dex == 0 {
 		/* This can happen if 0 bytes were written to d. */
-		d.consume(block{0, make([]byte, 0, bytesPerBlock)})
+		d.consume(block{0, nil})
 		d.dex++
 	}
 	d.summing.Wait()

@@ -24,7 +24,7 @@ const (
 
 var castagnoli = crc32.MakeTable(crc32.Castagnoli)
 
-/* TODO: Correct that CRC prevents consume() from being a constant-time operation for all inputs. */
+/* TODO: Correct that consume() is not a constant-time operation for inputs smaller than bytesPerBlock. */
 func (d *digest) consume(b block) {
 
 	// Initialization
