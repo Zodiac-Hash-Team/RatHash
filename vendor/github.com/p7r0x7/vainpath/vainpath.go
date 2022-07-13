@@ -4,26 +4,33 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+	. "unicode/utf8"
 )
 
 // Copyright © 2022 Matthew R Bonnette. Licensed under a BSD-3-Clause license.
 
 // Clean formats inputs in a way similar to the fish shell's method of shortening paths in
-// 'fish/functions/prompt_pwd.fish' and is Windows-sensitive; it will almost certainly not return
-// valid paths and should be used for vanity purposes only.
+// 'fish/functions/prompt_pwd.fish' and is properly Windows-sensitive; it will almost certainly not
+// return valid paths and should be used for vanity purposes only. If path is an invalid
+// UTF-8-encoded string, it is returned unaltered.
 func Clean(path string) string {
+	if path == "" || !ValidString(path) {
+		return path
+	}
 	segments := strings.Split(filepath.Clean(path), string(filepath.Separator))
 
 	/* Skips final index */
-	for i := len(segments) - 2; i >= 0; i-- {
-		if len(segments[i]) < 2 {
+	for i, v := range segments[:len(segments)-1] {
+		if RuneCountInString(v) < 2 {
 			continue
 		}
 
-		if unicode.IsLetter(rune(segments[i][0])) {
-			segments[i] = segments[i][:1]
+		r, w0 := DecodeRuneInString(v)
+		if unicode.IsLetter(r) {
+			segments[i] = v[:w0]
 		} else {
-			segments[i] = segments[i][:2]
+			_, w1 := DecodeRuneInString(v[w0:])
+			segments[i] = v[:w0+w1]
 		}
 	}
 
