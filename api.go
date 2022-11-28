@@ -121,10 +121,11 @@ func (d *Digest) Sum(buf []byte) []byte {
 	header.Len = cap(buf)
 	rem := buf[len(buf)-n:]
 
-	var zeroes = make([]byte, 512)
-	for d.read += uint64(n); n > 512; n -= 512 {
+	const bufSize = 512
+	var zeroes = make([]byte, bufSize)
+	for d.read += uint64(n); n > bufSize; n -= bufSize {
 		d.stream.XORKeyStream(rem, zeroes)
-		rem = rem[512:]
+		rem = rem[bufSize:]
 	}
 	d.stream.XORKeyStream(rem, zeroes[:n])
 	return buf

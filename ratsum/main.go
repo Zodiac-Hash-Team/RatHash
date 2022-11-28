@@ -21,7 +21,7 @@ import (
 
 // Copyright © 2022 Matthew R Bonnette. Licensed under the Apache-2.0 license.
 
-const n, bufSize = "\n", 8 << 10
+const n, bufSize = "\n", 512
 
 var warnings, pLength, pOffset, key, pNoCodesDefault = uint(0), uint(0), "", [32]byte{}, false
 var pHelp, pBase64, pKeyed, pNoCodes, pQuiet, pRaw, pStrict, pString, pTime, pDebug bool

@@ -20,7 +20,7 @@ func BenchmarkName(b *testing.B) {
 
 func BenchmarkName2(b *testing.B) {
 	blk := block{0, make([]byte, bytesPerBlock)}
-	d := newDigest([32]byte{}, 0, "")
+	d, _ := NewDigest([32]byte{}, [9]byte{})
 	b.SetBytes(bytesPerBlock)
 	b.ReportAllocs()
 	b.ResetTimer()
