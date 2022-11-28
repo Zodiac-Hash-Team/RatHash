@@ -5,8 +5,9 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"github.com/dterei/gotsc"
-	"github.com/p7r0x7/rathash/api"
+	"github.com/p7r0x7/rathash"
 	"github.com/zeebo/blake3"
+	"math/bits"
 	"runtime"
 	"sync"
 	"testing"
@@ -15,11 +16,11 @@ import (
 
 // Copyright © 2022 Matthew R Bonnette. Licensed under the Apache-2.0 license.
 
-var sizes = []int{64, 512 * 1024, 64 * 1024 * 1024, 1024 * 1024 * 1024}
+var sizes = []int{64, 512 << 10, 64 << 20, 1 << 30}
 var bytes, sha2, cpb, calltime = []byte(nil), "with sha512", "w/o cpb", gotsc.TSCOverhead()
 var fn = []func(b *testing.B){
 	func(b *testing.B) {
-		d := api.New(32)
+		d, _ := rathash.NewHash([32]byte{}, nil)
 		b.SetBytes(int64(len(bytes)))
 		b.ResetTimer()
 		for i := b.N; i > 0; i-- {
@@ -129,7 +130,7 @@ func fmtFloats(f ...float64) string {
 }
 
 func main() {
-	if runtime.GOARCH == "arm64" || runtime.GOARCH == "386" {
+	if runtime.GOARCH == "arm64" || bits.UintSize == 32 {
 		sha2 = "with sha256"
 	} else if calltime > 0 {
 		cpb = "with cpb"
