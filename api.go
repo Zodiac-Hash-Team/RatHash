@@ -34,7 +34,7 @@ type block struct {
 	data interface{}
 }
 
-var threads = 2 * runtime.NumCPU()
+var threads = runtime.NumCPU()
 var period, _ = big.NewInt(0).SetString("0x3f_ffff_ffff_ffff_ffff", 0)
 
 func KeySize() int { return 32 }
@@ -104,15 +104,12 @@ func (d *Digest) Sum(buf []byte) []byte {
 		//
 		// #$%&'()* +,-./012 3456789: ;<=>?@AB CDEFGHIJ KLMNOPQR STUVWXYZ [\]^_`ab
 		d.stream.SetCounter(0 |
-			uint64(d.offset[0])<<(2+56) |
-			uint64(d.offset[1])<<(2+48) |
-			uint64(d.offset[2])<<(2+40) |
-			uint64(d.offset[3])<<(2+32) |
-			uint64(d.offset[4])<<(2+24) |
-			uint64(d.offset[5])<<(2+16) |
-			uint64(d.offset[6])<<(2+8) |
-			uint64(d.offset[7])<<2 |
+			uint64(d.offset[0])<<(2+56) | uint64(d.offset[1])<<(2+48) |
+			uint64(d.offset[2])<<(2+40) | uint64(d.offset[3])<<(2+32) |
+			uint64(d.offset[4])<<(2+24) | uint64(d.offset[5])<<(2+16) |
+			uint64(d.offset[6])<<(2+8) | uint64(d.offset[7])<<2 |
 			uint64(d.offset[8])>>6)
+
 		skip := make([]byte, d.offset[8]&63, 63)
 		d.stream.XORKeyStream(skip, skip)
 	}
@@ -192,9 +189,9 @@ func (d *Digest) Reset() {
 
 func (d *Digest) initWorkers() {
 	d.to = make(chan block, threads)
+	d.summing.Add(threads)
 	for i := threads; i > 0; i-- {
 		go func() {
-			d.summing.Add(1)
 			for b := range d.to {
 				d.from <- block{b.dex, d.consume(b, fracPhi)}
 			}

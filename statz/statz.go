@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"crypto/sha512"
-	"fmt"
+	. "fmt"
 	"github.com/dterei/gotsc"
 	"github.com/p7r0x7/rathash"
 	"github.com/zeebo/blake3"
@@ -25,7 +25,7 @@ var fn = []func(b *testing.B){
 		b.ResetTimer()
 		for i := b.N; i > 0; i-- {
 			d.Write(bytes)
-			d.Sum(nil)
+			d.Sum(bytes[:len(bytes)-32])
 		}
 		b.StopTimer()
 		d.Reset()
@@ -56,13 +56,13 @@ var fn = []func(b *testing.B){
 func benchAlg(alg int) {
 	switch alg {
 	case 0:
-		fmt.Println("github.com/p7r0x7/rathash/api")
+		Println("github.com/p7r0x7/rathash")
 	case 1:
-		fmt.Println("crypto/sha256")
+		Println("crypto/sha256")
 	case 2:
-		fmt.Println("crypto/sha512")
+		Println("crypto/sha512")
 	case 3:
-		fmt.Println("github.com/zeebo/blake3")
+		Println("github.com/zeebo/blake3")
 	}
 	throughputs, speeds, usages :=
 		make([]float64, len(sizes)), make([]float64, len(sizes)), make([]float64, len(sizes))
@@ -96,11 +96,11 @@ func benchAlg(alg int) {
 		usages[i] = float64(r.AllocedBytesPerOp())
 	}
 
-	fmt.Println("Speed " + fmtFloats(throughputs...) + "   MB/s")
+	Println("Speed " + fmtFloats(throughputs...) + "   MB/s")
 	if cpb == "with cpb" {
-		fmt.Println("      " + fmtFloats(speeds...) + "   cpb")
+		Println("      " + fmtFloats(speeds...) + "   cpb")
 	}
-	fmt.Println("Usage " + fmtFloats(usages...) + "   B/op\n")
+	Println("Usage " + fmtFloats(usages...) + "   B/op\n")
 }
 
 func fmtFloats(f ...float64) string {
@@ -124,7 +124,7 @@ func fmtFloats(f ...float64) string {
 		default:
 			style = "%8.f"
 		}
-		str += "  " + fmt.Sprintf(style, v)
+		str += "  " + Sprintf(style, v)
 	}
 	return str
 }
@@ -136,7 +136,7 @@ func main() {
 		cpb = "with cpb"
 	}
 
-	fmt.Printf("Running Statz on %d CPUs!\n%s/%s: %s, %s\n\n"+
+	Printf("Running Statz on %d CPUs!\n%s/%s: %s, %s\n\n"+
 		"           64B      512K       64M       1G\n",
 		runtime.NumCPU(), runtime.GOOS, runtime.GOARCH, sha2, cpb)
 
@@ -149,5 +149,5 @@ func main() {
 	}
 	benchAlg(3)
 
-	fmt.Println("Finished in " + time.Since(t).Truncate(time.Millisecond).String() + ".")
+	Println("Finished in " + time.Since(t).Truncate(time.Millisecond).String() + ".")
 }

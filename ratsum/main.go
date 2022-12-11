@@ -21,13 +21,8 @@ import (
 
 // Copyright © 2022 Matthew R Bonnette. Licensed under the Apache-2.0 license.
 
-const (
-	n       = "\n"
-	bufSize = 512
-	success = 0
-	failure = 1
-	invalid = 2
-)
+const n, bufSize = "\n", 512
+const success, failure, invalid = 0, 1, 2
 
 var key, warnings = [32]byte{}, 0
 
