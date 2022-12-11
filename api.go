@@ -18,7 +18,6 @@ import (
 /* TODO: Add API documentation for exported functions. */
 
 type Digest struct {
-	active     bool
 	dex, read  uint64
 	offset     [9]byte
 	to, from   chan block
@@ -35,7 +34,7 @@ type block struct {
 	data interface{}
 }
 
-var threads = runtime.NumCPU()
+var threads = 2 * runtime.NumCPU()
 var period, _ = big.NewInt(0).SetString("0x3f_ffff_ffff_ffff_ffff", 0)
 
 func KeySize() int { return 32 }
@@ -48,6 +47,7 @@ func NewHash(key [32]byte, offset *big.Int) (hash.Hash, error) {
 	if offset == nil {
 		offset = big.NewInt(0)
 	}
+
 	var bytes [9]byte
 	offset.Mod(offset, period).FillBytes(bytes[:])
 	return NewDigest(key, bytes)
@@ -60,8 +60,7 @@ func NewDigest(key [32]byte, offset [9]byte) (*Digest, error) {
 	d := &Digest{
 		carry: make([]byte, 0, bytesPerBlock),
 		list:  map[uint64][32]byte{},
-		key:   key, offset: offset,
-		active: true}
+		key:   key, offset: offset}
 
 	d.initWorkers()
 	d.initMapper()
@@ -167,8 +166,8 @@ func (d *Digest) finalize() {
 		}
 	}
 	d.mapping.Unlock()
-	d.to = make(chan block, threads)
-	d.from = make(chan block, threads)
+	d.initWorkers()
+	d.initMapper()
 	d.final = final
 }
 
@@ -189,28 +188,6 @@ func (d *Digest) Reset() {
 	for k := range d.list {
 		delete(d.list, k) /* Optimizes to a memclr(). */
 	}
-}
-
-func (d *Digest) Deactivate() error {
-	if d.active {
-		d.active = false
-		close(d.to)
-		d.summing.Wait()
-		close(d.from)
-		d.Reset()
-		return nil
-	}
-	return errors.New("rathash: Digest already inactive")
-}
-
-func (d *Digest) Reactivate() error {
-	if !d.active {
-		d.active = true
-		d.initWorkers()
-		d.initMapper()
-		return nil
-	}
-	return errors.New("rathash: Digest already active")
 }
 
 func (d *Digest) initWorkers() {

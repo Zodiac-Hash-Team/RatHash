@@ -21,16 +21,20 @@ import (
 
 // Copyright © 2022 Matthew R Bonnette. Licensed under the Apache-2.0 license.
 
-const n, bufSize = "\n", 512
+const (
+	n       = "\n"
+	bufSize = 512
+	success = 0
+	failure = 1
+	invalid = 2
+)
 
-var warnings, pLength, pOffset, key, pNoCodesDefault = uint(0), uint(0), "", [32]byte{}, false
-var pHelp, pBase64, pKeyed, pNoCodes, pQuiet, pRaw, pStrict, pString, pTime, pDebug bool
-var star, yell, purp, und, zero = "", "\033[33m", "\033[35m", "\033[4m", "\033[0m"
+var key, warnings = [32]byte{}, 0
 
 func main() { os.Exit(program()) }
 
 // help prints a usage menu and quietly exits if no non-flag arguments are given. To consistently
-// and correctly render this menu in most terminal windows, its content should be no wider than 80
+// correctly render this menu in most terminal windows, its content should be no wider than 80
 // columns.
 func help() {
 	origin, err := os.Executable()
@@ -51,7 +55,7 @@ func help() {
 	name = vainpath.Trim(origin, "…", 15)
 	Print(n+"Order of arguments placed after `", name, "` does not matter unless `--` is"+n+
 		"specified, signaling the end of parsed flags. Long-form flag equivalents are"+n+
-		"above. `-` is treated as a reference to STDIN."+n)
+		"above. `-` is treated as a reference to "+os.Stdin.Name()+" on this platform."+n)
 }
 
 // This program is a command-line interface for rathash: It handles various flags and an unlimited
@@ -60,36 +64,23 @@ func help() {
 func program() int {
 	if pDebug {
 		cf, err := os.Create("cpu.prof")
-		if err != nil {
-			quit(err)
-		}
 		_ = pprof.StartCPUProfile(cf)
 		defer pprof.StopCPUProfile()
 
 		tf, err := os.Create("goroutine.prof")
-		if err != nil {
-			quit(err)
-		}
 		defer pprof.Lookup("goroutine").WriteTo(tf, 0)
 
 		bf, err := os.Create("block.prof")
-		if err != nil {
-			quit(err)
-		}
 		defer pprof.Lookup("block").WriteTo(bf, 0)
 
 		af, err := os.Create("allocs.prof")
-		if err != nil {
-			quit(err)
-		}
 		defer pprof.Lookup("allocs").WriteTo(af, 0)
 
 		mf, err := os.Create("mutex.prof")
-		if err != nil {
-			quit(err)
-		}
 		defer pprof.Lookup("mutex").WriteTo(mf, 0)
-
+		if err != nil {
+			panic(err)
+		}
 	} else {
 		defer func() {
 			if err := recover(); err != nil {
@@ -100,7 +91,7 @@ func program() int {
 
 	if pHelp || NArg() == 0 {
 		help()
-		return 0
+		return success
 	}
 	if pLength == 0 {
 		Fprint(os.Stderr, purp, "Output length should be at least 1 byte.", zero, n)
@@ -210,9 +201,9 @@ func program() int {
 		}
 	}
 	if warnings > 0 {
-		return 1
+		return failure
 	}
-	return 0
+	return success
 }
 
 func warn(err ...interface{}) {

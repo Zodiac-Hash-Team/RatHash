@@ -3,12 +3,29 @@
 package main
 
 import (
-	. "bytes"
-	"os/exec"
+	. "golang.org/x/sys/windows"
+	"os"
 )
 
 func init() {
-	out, _ := exec.Command("TASKLIST", "/FI", "IMAGENAME eq cmd.exe").Output()
-	pNoCodesDefault = Contains(out, []byte("cmd.exe"))
+	for _, v := range [2]Handle{
+		Handle(os.Stdout.Fd()),
+		Handle(os.Stderr.Fd()),
+	} {
+		var mode uint32
+		err := GetConsoleMode(v, &mode)
+		if err != nil {
+			pNoCodesDefault = true
+			break
+		}
+		if mode&ENABLE_VIRTUAL_TERMINAL_PROCESSING == 0 {
+			err = SetConsoleMode(v,
+				mode|ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+			if err != nil {
+				pNoCodesDefault = true
+				break
+			}
+		}
+	}
 	pNoCodes = pNoCodesDefault
 }

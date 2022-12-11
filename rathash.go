@@ -39,8 +39,8 @@ const (
 	perform a second-preimage attack based off the final hash of a given message. Here, that
 	difference is different weyl sequence.
 
-	TODO: Do more testing to see if other public constants (various square roots, etc.)...
-	yield noticibly more entropic sequences for the first wordsPerBlock*rounds values. If so, such
+	TODO: Do more testing to see if other public constants (various square roots, etc.) yield
+	noticibly more entropic sequences for the first wordsPerBlock*rounds values. If so, such
 	seeds could make hashes for small messages more secure. */
 )
 
@@ -48,8 +48,7 @@ func (d *Digest) consume(b block, seed uint64) [32]byte {
 
 	// Initialization
 	written, sums, key := make([]byte, bytesPerBlock), [8]uint64{}, d.scheduleKey(b.dex)
-	words := (*[wordsPerBlock]uint64)(Pointer(&written[0]))[:]
-	n := copy(written, b.data.([]byte))
+	n, words := copy(written, b.data.([]byte)), (*[wordsPerBlock]uint64)(Pointer(&written[0]))[:]
 	unwritten := written[n:]
 	written = written[:n] /* Bounds check eliminated. */
 
