@@ -34,7 +34,7 @@ type block struct {
 	data interface{}
 }
 
-var threads = runtime.NumCPU()
+var threads = 2 * runtime.NumCPU()
 var period, _ = big.NewInt(0).SetString("0x3f_ffff_ffff_ffff_ffff", 0)
 
 func KeySize() int { return 32 }
