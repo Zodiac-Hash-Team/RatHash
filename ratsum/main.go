@@ -9,14 +9,15 @@ import (
 	. "github.com/spf13/pflag"
 	"hash"
 	"io"
-	"log"
 	"math/big"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime/pprof"
 	"strings"
 	"time"
 	"unicode/utf8"
+	"unsafe"
 )
 
 // Copyright © 2022 Matthew R Bonnette. Licensed under the Apache-2.0 license.
@@ -40,7 +41,7 @@ func help() {
 	}
 	name := vainpath.Trim(origin, "…", 12)
 	spaces := strings.Repeat(" ", utf8.RuneCountInString(name)+3)
-	Print(yell, "The hopefully—eventually—cryptographic hashing algorithm.", zero, n+n+
+	Fprint(os.Stderr, yell, "The hopefully—eventually—cryptographic hashing algorithm.", zero, n+n+
 		"Usage:"+n+
 		"  ", name, " [-h]"+n,
 		spaces, "[-bKt] [-l <uint>] [--quiet|no-codes] [--strict|raw] -|PATH..."+n,
@@ -48,14 +49,13 @@ func help() {
 			"Options:"+n)
 	PrintDefaults()
 	name = vainpath.Trim(origin, "…", 15)
-	Print(n+"Order of arguments placed after `", name, "` does not matter unless `--` is"+n+
-		"specified, signaling the end of parsed flags. Long-form flag equivalents are"+n+
-		"above. `-` is treated as a reference to "+os.Stdin.Name()+" on this platform."+n)
+	Fprint(os.Stderr, n+"Order of arguments placed after `", name, "` does not matter unless `--` is"+
+		n+"specified, signaling the end of parsed flags. Long-form flag equivalents are"+n+
+		"above. `-` is treated as a reference to ", os.Stdin.Name(), " on this platform."+n)
 }
 
 // This program is a command-line interface for rathash: It handles various flags and an unlimited
-// number of arguments, processing files as required by the command-line operator. It also enables
-// the printing of a usage menu.
+// number of arguments, processing files as required by the command-line operator.
 func program() int {
 	if pDebug {
 		cf, err := os.Create("cpu.prof")
@@ -76,27 +76,18 @@ func program() int {
 		if err != nil {
 			panic(err)
 		}
-	} else {
-		defer func() {
-			if err := recover(); err != nil {
-				quit(err)
-			}
-		}()
 	}
 
 	if pHelp || NArg() == 0 {
 		help()
 		return success
-	}
-	if pLength == 0 {
-		Fprint(os.Stderr, purp, "Output length should be at least 1 byte.", zero, n)
-		return 2
+	} else if pLength == 0 {
+		panic("Output length should be at least 1 byte.")
 	}
 
 	var digest, enc, sum = hash.Hash(nil), interface{}(nil), make([]byte, bufSize)
 	if offset, ok := big.NewInt(0).SetString(pOffset, 0); !ok {
-		Fprint(os.Stderr, purp, "Invalid offset format.", zero, n)
-		return 2
+		panic("Invalid offset format.")
 	} else {
 		digest, _ = rathash.NewHash(key, offset)
 	}
@@ -105,11 +96,12 @@ func program() int {
 	} else {
 		enc = hex.NewEncoder(os.Stdout)
 	}
+
 	if pKeyed {
 		if _, err := io.ReadAtLeast(os.Stdin, key[:], rathash.KeySize()); err != nil {
-			quit(err)
+			panic(err)
 		}
-		_ = os.Stdin.Close()
+		go os.Stdin.Close() /* STDIN should not be reused. */
 		star = "(*)"
 	}
 	buf := sum[:0]
@@ -122,7 +114,7 @@ func program() int {
 
 		if pString {
 			/* hash.Hash does not implement (*Writer).WriteString. */
-			if _, err := digest.Write([]byte(target)); err != nil {
+			if _, err := digest.Write(strToBytes(target)); err != nil {
 				warn(err)
 				continue
 			}
@@ -131,27 +123,30 @@ func program() int {
 				warn(err)
 				continue
 			}
-			_ = os.Stdin.Close()
+			go os.Stdin.Close() /* STDIN should not be reused. */
 		} else {
 			if file, err := os.Open(target); err != nil {
 				warn(err)
 				continue
 			} else {
 				_, err = io.Copy(digest, file)
-				if _ = file.Close(); err != nil {
+				go file.Close()
+				if err != nil {
 					warn(err)
 					continue
 				}
 			}
 		}
-		if d := time.Since(start); pTime {
+
+		if pTime {
+			d := time.Since(start)
 			if d.Microseconds() > 99 {
 				d = d.Truncate(10 * time.Microsecond)
 			}
 			delta = " (" + d.String() + ")"
 		}
-		if pRaw {
-			rem := pLength
+
+		if rem := pLength; pRaw {
 			for ; rem > bufSize; rem -= bufSize {
 				digest.Sum(buf)
 				os.Stdout.Write(sum)
@@ -160,32 +155,31 @@ func program() int {
 			digest.Sum(sum[rem:rem])
 			os.Stdout.Write(sum[rem:])
 			continue
-		}
-
-		if !pQuiet {
-			Print(star, yell)
-		}
-		rem := pLength
-		for ; rem > bufSize; rem -= bufSize {
-			digest.Sum(buf)
-			enc.(io.Writer).Write(sum)
-		}
-		rem = uint(cap(sum)) - rem
-		digest.Sum(sum[rem:rem])
-		enc.(io.Writer).Write(sum[rem:])
-		if pBase64 {
-			enc.(io.Closer).Close()
-		}
-		if !pQuiet {
-			if pString {
-				Print(zero, `  "`, target, `"`, delta)
-			} else if pNoCodes {
-				Print(`  `, filepath.Clean(target), delta)
-			} else {
-				Print(zero, `  `, und, vainpath.Simplify(target), zero, delta)
+		} else {
+			if !pQuiet {
+				Print(star, yell)
+			}
+			for ; rem > bufSize; rem -= bufSize {
+				digest.Sum(buf)
+				enc.(io.Writer).Write(sum)
+			}
+			rem = uint(cap(sum)) - rem
+			digest.Sum(sum[rem:rem])
+			enc.(io.Writer).Write(sum[rem:])
+			if pBase64 {
+				enc.(io.Closer).Close()
 			}
 		}
-		os.Stdout.WriteString(n)
+
+		if pQuiet {
+			os.Stdout.WriteString(n)
+		} else if pString {
+			Print(zero, `  "`, target, `"`, zero, delta, n)
+		} else if pNoCodes {
+			Print(`  `, filepath.Clean(target), delta, n)
+		} else {
+			Print(zero, `  `, und, vainpath.Simplify(target), zero, delta, n)
+		}
 	}
 
 	if !(pQuiet || pRaw) {
@@ -201,16 +195,18 @@ func program() int {
 	return success
 }
 
-func warn(err ...interface{}) {
-	if pStrict {
-		quit(err)
-	}
-	warnings++
+// strToBytes converts any string into a byte slices without allocating memory; as discussed in
+// https://stackoverflow.com/a/69231355, this practice is safe so long as the underlying memory is
+// not modified during its lifetime.
+func strToBytes(s string) []byte {
+	const MaxInt32 = 1<<31 - 1
+	return (*[MaxInt32]byte)(unsafe.Pointer((*reflect.StringHeader)(
+		unsafe.Pointer(&s)).Data))[: len(s)&MaxInt32 : len(s)&MaxInt32]
 }
 
-func quit(err ...interface{}) {
-	if pDebug {
+func warn(err ...interface{}) {
+	if pStrict {
 		panic(err)
 	}
-	log.Fatal(purp, err, zero)
+	warnings++
 }

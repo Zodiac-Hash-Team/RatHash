@@ -4,9 +4,12 @@ github.com/aead/chacha20/chacha
 # github.com/dterei/gotsc v0.0.0-20160722215413-e78f872945c6
 ## explicit
 github.com/dterei/gotsc
-# github.com/klauspost/cpuid/v2 v2.0.12
+# github.com/klauspost/cpuid/v2 v2.2.3
 ## explicit; go 1.15
 github.com/klauspost/cpuid/v2
+# github.com/minio/sha256-simd v1.0.1
+## explicit; go 1.17
+github.com/minio/sha256-simd
 # github.com/p7r0x7/vainpath v0.5.0
 ## explicit; go 1.11
 github.com/p7r0x7/vainpath
@@ -25,8 +28,12 @@ github.com/zeebo/blake3/internal/alg/hash/hash_avx2
 github.com/zeebo/blake3/internal/alg/hash/hash_pure
 github.com/zeebo/blake3/internal/consts
 github.com/zeebo/blake3/internal/utils
-# golang.org/x/sys v0.3.0
+# github.com/zeebo/xxh3 v1.0.2
+## explicit; go 1.17
+github.com/zeebo/xxh3
+# golang.org/x/sys v0.8.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/unix
 golang.org/x/sys/windows
