@@ -1,6 +1,8 @@
 package rathash
 
 import (
+	"github.com/aead/chacha20/chacha"
+	"github.com/zeebo/xxh3"
 	"math/bits"
 	. "unsafe"
 )
@@ -12,13 +14,13 @@ import (
 // The Go Authors and the designers of any third-party software utilized in this project.
 
 const (
-	rounds          = 5
-	bytesPerBlock   = 32 << 10
-	wordsPerBlock   = bytesPerBlock / 8
-	pcgHi, pcgLo    = 2549297995355413924, 4865540595714422341
-	fracPhi, fracPi = 0x9e3779b97f4a7c15, 0x243f6a8885a308d3
+	bytesPerWord, bytesPerKey, rounds = 8, 32, bytesPerKey / bytesPerWord
+	bytesPerBlock, wordsPerBlock      = 32 << 10, bytesPerBlock / bytesPerWord
+	fracPhi, fracPi                   = 0x9e3779b97f4a7c15, 0x243f6a8885a308d3
+	rot, rsh, lsh                     = 24, 11, 3
+
 	/* RatHash's compression function employs simply normal Weyl sequences with the constants above
-	as described by Hermann Weyl in 1916 and first implemented in pseudo-random number generators by
+	as described by Hermann Weyl in 1916 and first implemented in pseudorandom number generators by
 	George Marsaglia in his 2003 publication "Xorshift RNGs" https://doi.org/10.18637/jss.v008.i14.
 	Index 0—which is always 0 for any given seed—is skipped here, but successive values are added to
 	words of each block as they are processed each round. This dramatically increases the complexity
@@ -37,83 +39,72 @@ const (
 	Why two values? As it happens, this is a hash list-based algorithm, and without some difference
 	between the initial hash calculation and the internal product hashing, an attacker can trivially
 	perform a second-preimage attack based off the final hash of a given message. Here, that
-	difference is different weyl sequence.
+	difference is a different weyl sequence. */
 
-	TODO: Do more testing to see if other public constants (various square roots, etc.) yield
+	/* TODO: Do more testing to see if other public constants (various square roots, etc.) yield
 	noticibly more entropic sequences for the first wordsPerBlock*rounds values. If so, such
 	seeds could make hashes for small messages more secure. */
 )
 
-func (d *Digest) consume(b block, seed uint64) [32]byte {
+func (d *Digest) primary(dex uint64, data [bytesPerBlock]byte, n uint) [32]byte {
 
 	// Initialization
-	written, sums, key := make([]byte, bytesPerBlock), [8]uint64{}, d.scheduleKey(b.dex)
-	n, words := copy(written, b.data.([]byte)), (*[wordsPerBlock]uint64)(Pointer(&written[0]))[:]
-	unwritten := written[n:]
-	written = written[:n] /* Bounds check eliminated. */
+	sums := [4]uint64{}
+	regs, words := (*[regsPerBlock]uint)(Pointer(&data)), (*[wordsPerBlock]uint64)(Pointer(&data))
+	unwritten, written := regs[n/bytesPerReg-n/bytesPerBlock:], regs[:n/bytesPerReg-n/bytesPerBlock+1]
+	edge, mask := &regs[n/bytesPerReg-n/bytesPerBlock], ^(^uint(0)<<(n%bytesPerReg*8))-n/bytesPerBlock
 
 	// Rounds
-	for i := uint64(0); i < rounds; i++ {
-		/* Only the following reset each round: */
-		prepend := (b.dex*rounds + i) * wordsPerBlock * seed
-		var subkey, pHi, pLo, val uint64
-		if i < 4 {
-			subkey = key[i]
-		}
+	for i, sA := range d.scheduleKey(fracPhi * dex) {
+		var prepend = fracPhi * (uint64(i) + rounds*dex) * wordsPerBlock
+
 		for i2 := range written {
-			/* This makes consume() a constant-time operation for all inputs. */
-			written[i2] ^= 0x00 /* This *must not* be optimized out. */
+			written[i2] ^= uint(0) /* This makes primary() a constant-time operation for all inputs. */
 		}
+		*edge ^= mask
 		for i2 := range unwritten {
-			/* This eliminates certain trivial collisions. */
-			unwritten[i2] ^= 0xff
+			unwritten[i2] ^= ^uint(0) /* This eliminates certain trivial collisions. */
 		}
 
+		sB, sC, sCtr := sA, sA, uint64(1)
+		for i2 := 0; i2 < 12; i2++ {
+			t := sA + sB + sCtr
+			sCtr++
+			sA = sB ^ sB>>rsh
+			sB = sC + sC<<lsh
+			sC = t + bits.RotateLeft64(sC, rot)
+		}
 		for i2 := uint64(0); i2 < wordsPerBlock; i2++ {
-			next := val%(wordsPerBlock-i2) + i2
-			t := words[next] + prepend + seed*(next+1)
+			t := sA + sB + sCtr
+			sCtr++
+			sA = sB ^ sB>>rsh
+			sB = sC + sC<<lsh
+			sC = t + bits.RotateLeft64(sC, rot)
+
+			next := t%(wordsPerBlock-i2) + i2
+			t = words[next] + prepend + fracPhi*(next+1)
 			words[next] = words[i2]
-			words[i2] = t - subkey /* Key element for the next round. */
-
-			pLo += t /* Update lower state. */
-			/* pcgmcg128xslrr64 updates sums; the 128-bit multiplication it requires is emulated using
-			64-bit values. See https://github.com/imneme/pcg-c/blob/master/include/pcg_variants.h. */
-			/* TODO: Obviate 64-bit emulation with 128-bit SIMD ASM. */
-			hi, lo := bits.Mul64(pLo, pcgLo)
-			hi += pcgHi*pLo + pcgLo*pHi
-			pHi, pLo = hi, lo
-			val = bits.RotateLeft64(pHi^pLo, int(pHi>>58))
-
-			sums[next&7] -= val /* Decrement the *appropriate* sum. */
+			words[i2] = t
 		}
+
+		sums[i] = xxh3.Hash(data[:])
 	}
 
 	// Return Checksum
-	folded := [4]uint64{sums[0] ^ sums[4], sums[1] ^ sums[5], sums[2] ^ sums[6], sums[3] ^ sums[7]}
-	return *(*[32]byte)(Pointer(&folded[0]))
+	return *(*[32]byte)(Pointer(&sums[0]))
 }
 
-func (d *Digest) scheduleKey(dex uint64) [4]uint64 {
-	dex++
-	key := [4]uint64{
-		dex * (dex + *(*uint64)(Pointer(&d.key[0]))),
-		dex * (dex + *(*uint64)(Pointer(&d.key[8]))),
-		dex * (dex + *(*uint64)(Pointer(&d.key[16]))),
-		dex * (dex + *(*uint64)(Pointer(&d.key[24])))}
-
-	var jA, jB, jC, jD uint64
-	for _, v := range key {
-		jA = 0xf1ea5eed
-		jB -= v
-		jC -= v
-		jD -= v
-		for i2 := 10; i2 > 0; i2-- {
-			jE := jA - bits.RotateLeft64(jB, 7)
-			jA = jB ^ bits.RotateLeft64(jC, 13)
-			jB = jC + bits.RotateLeft64(jD, 37)
-			jC = jD + jE
-			jD = jE + jA
-		}
-	}
-	return [4]uint64{jA, jB, jC, jD}
+func (d *Digest) scheduleKey(nonce uint64) [4]uint64 {
+	key := make([]byte, bytesPerKey)
+	chacha.XORKeyStream(key, key,
+		[]byte{byte(nonce >> 56),
+			byte(nonce >> 48),
+			byte(nonce >> 40),
+			byte(nonce >> 32),
+			byte(nonce >> 24),
+			byte(nonce >> 16),
+			byte(nonce >> 8),
+			byte(nonce)},
+		d.key[:], 8)
+	return *(*[4]uint64)(Pointer(&key[0]))
 }

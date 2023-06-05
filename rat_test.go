@@ -2,55 +2,66 @@ package rathash
 
 import (
 	"fmt"
-	"math/bits"
+	"github.com/zeebo/blake3"
+	"github.com/zeebo/xxh3"
 	"testing"
-	"unsafe"
 )
 
-func BenchmarkName(b *testing.B) {
-	bytes := make([]byte, 32)
+func BenchmarkRatHash(b *testing.B) {
+	d, _ := NewDigest([32]byte{}, [9]byte{})
+	msg := make([]byte, b.N)
+	b.SetBytes(1)
+	b.ReportAllocs()
+	b.ResetTimer()
+	d.Write(msg)
+	d.Sum(nil)
+	b.StopTimer()
+	d.Reset()
+}
+
+func BenchmarkBlake3(b *testing.B) {
+	h, msg := blake3.New(), make([]byte, 1<<10)
+	b.SetBytes(1 << 10)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		scheduleKey(bytes, 0)
+		h.Write(msg)
+		h.Sum(nil)
 	}
 	b.StopTimer()
-	fmt.Printf("%x\n", scheduleKey(bytes, 0xffffffffffffffff))
+	h.Reset()
 }
 
 func BenchmarkName2(b *testing.B) {
-	blk := block{0, make([]byte, bytesPerBlock)}
 	d, _ := NewDigest([32]byte{}, [9]byte{})
+	blk := [bytesPerBlock]byte{}
 	b.SetBytes(bytesPerBlock)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		d.consume(blk, fracPhi)
+		d.primary(uint64(i), blk, bytesPerBlock)
 	}
 }
 
-func scheduleKey(key []byte, dex uint64) [4]uint64 {
-	dex++
-	words := [4]uint64{
-		dex * (dex + *(*uint64)(unsafe.Pointer(&key[0]))),
-		dex * (dex + *(*uint64)(unsafe.Pointer(&key[8]))),
-		dex * (dex + *(*uint64)(unsafe.Pointer(&key[16]))),
-		dex * (dex + *(*uint64)(unsafe.Pointer(&key[24])))}
-
-	var jA, jB, jC, jD uint64
-	for _, v := range words {
-		jA = 0xf1ea5eed
-		jB -= v
-		jC -= v
-		jD -= v
-		for i2 := 10; i2 > 0; i2-- {
-			jE := jA - bits.RotateLeft64(jB, 7)
-			jA = jB ^ bits.RotateLeft64(jC, 13)
-			jB = jC + bits.RotateLeft64(jD, 37)
-			jC = jD + jE
-			jD = jE + jA
-		}
+func BenchmarkName(b *testing.B) {
+	d, _ := NewDigest([32]byte{}, [9]byte{})
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		d.scheduleKey(0)
 	}
+	b.StopTimer()
+	fmt.Printf("%x\n", d.scheduleKey(0))
+}
 
-	return [4]uint64{jA, jB, jC, jD}
+func BenchmarkXXH3(b *testing.B) {
+	h := xxh3.New()
+	msg := make([]byte, b.N)
+	b.SetBytes(1)
+	b.ReportAllocs()
+	b.ResetTimer()
+	h.Write(msg)
+	h.Sum(nil)
+	b.StopTimer()
+	h.Reset()
 }
